@@ -11,6 +11,5 @@ storage/framework/views/*
 storage/logs/*
 Dockerfile
 .dockerignore
-docker
 tests
 phpunit.xml
