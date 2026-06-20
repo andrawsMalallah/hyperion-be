@@ -32,6 +32,7 @@ class ExerciseSeeder extends Seeder
             ['name' => 'Guillotine Press', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound'],
             // Isolation
             ['name' => 'Flat Dumbbell Fly', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Isolation'],
+            ['name' => 'Machine Incline Press', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Isolation'],
             ['name' => 'Incline Dumbbell Fly', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Isolation'],
             ['name' => 'Decline Dumbbell Fly', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Isolation'],
             ['name' => 'Pec Deck Fly', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Isolation'],

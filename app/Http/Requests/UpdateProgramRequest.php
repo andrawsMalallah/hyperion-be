@@ -26,7 +26,7 @@ class UpdateProgramRequest extends FormRequest
             'name' => 'sometimes|string|max:255',
             'is_active' => 'boolean',
             'days' => 'sometimes|array',
-            'days.*.id' => 'nullable|integer|exists:Program_days,id',
+            'days.*.id' => 'nullable|integer|exists:program_days,id',
             'days.*.day_name' => 'required|string|max:255',
             'days.*.display_order' => 'integer',
             'days.*.exercises' => 'sometimes|array',

@@ -55,16 +55,16 @@ class ProgramController extends Controller
     {
         $validated = $request->validated();
 
-        $Program = \DB::transaction(function () use ($request, $validated) {
+        $program = \DB::transaction(function () use ($request, $validated) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
                 $request->user()->programs()->update(['is_active' => false]);
             }
 
-            $Program = $request->user()->programs()->create($validated);
+            $program = $request->user()->programs()->create($validated);
 
             if ($request->has('days')) {
                 foreach ($request->days as $dayData) {
-                    $day = $Program->days()->create([
+                    $day = $program->days()->create([
                         'day_name' => $dayData['day_name'],
                         'display_order' => $dayData['display_order'] ?? 0,
                     ]);
@@ -79,52 +79,52 @@ class ProgramController extends Controller
                 }
             }
 
-            return $Program;
+            return $program;
         });
 
-        return new ProgramResource($Program->load('days.exercises'));
+        return new ProgramResource($program->load('days.exercises'));
     }
 
-    public function show(Request $request, Program $Program)
+    public function show(Request $request, Program $program)
     {
-        if ($request->user()->id !== $Program->user_id) {
+        if ($request->user()->id !== $program->user_id) {
             abort(403);
         }
 
-        return new ProgramResource($Program->load('days.exercises'));
+        return new ProgramResource($program->load('days.exercises'));
     }
 
-    public function update(UpdateProgramRequest $request, Program $Program)
+    public function update(UpdateProgramRequest $request, Program $program)
     {
-        if ($request->user()->id !== $Program->user_id) {
+        if ($request->user()->id !== $program->user_id) {
             abort(403);
         }
 
         $validated = $request->validated();
 
-        \DB::transaction(function () use ($request, $Program, $validated) {
+        \DB::transaction(function () use ($request, $program, $validated) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
-                $request->user()->programs()->where('id', '!=', $Program->id)->update(['is_active' => false]);
+                $request->user()->programs()->where('id', '!=', $program->id)->update(['is_active' => false]);
             }
 
-            $Program->update($validated);
+            $program->update($validated);
 
             if ($request->has('days')) {
                 // Get existing day IDs that are being kept
                 $keptDayIds = collect($request->days)->pluck('id')->filter()->toArray();
 
                 // Delete days that are no longer in the payload
-                $Program->days()->whereNotIn('id', $keptDayIds)->delete();
+                $program->days()->whereNotIn('id', $keptDayIds)->delete();
 
                 foreach ($request->days as $dayData) {
-                    if (isset($dayData['id']) && $Program->days()->where('id', $dayData['id'])->exists()) {
-                        $day = $Program->days()->find($dayData['id']);
+                    if (isset($dayData['id']) && $program->days()->where('id', $dayData['id'])->exists()) {
+                        $day = $program->days()->find($dayData['id']);
                         $day->update([
                             'day_name' => $dayData['day_name'],
                             'display_order' => $dayData['display_order'] ?? 0,
                         ]);
                     } else {
-                        $day = $Program->days()->create([
+                        $day = $program->days()->create([
                             'day_name' => $dayData['day_name'],
                             'display_order' => $dayData['display_order'] ?? 0,
                         ]);
@@ -143,32 +143,32 @@ class ProgramController extends Controller
             }
         });
 
-        return new ProgramResource($Program->load('days.exercises'));
+        return new ProgramResource($program->load('days.exercises'));
     }
 
     public function getByDay(Request $request, $dayId)
     {
         $day = ProgramDay::findOrFail($dayId);
-        $Program = $day->Program;
-        if ($request->user()->id !== $Program->user_id) {
+        $program = $day->program;
+        if ($request->user()->id !== $program->user_id) {
             abort(403);
         }
 
-        return new ProgramResource($Program->load('days.exercises'));
+        return new ProgramResource($program->load('days.exercises'));
     }
 
-    public function destroy(Request $request, Program $Program)
+    public function destroy(Request $request, Program $program)
     {
-        if ($request->user()->id !== $Program->user_id) {
+        if ($request->user()->id !== $program->user_id) {
             abort(403);
         }
 
-        \DB::transaction(function () use ($Program) {
-            $dayIds = $Program->days()->pluck('id')->toArray();
+        \DB::transaction(function () use ($program) {
+            $dayIds = $program->days()->pluck('id')->toArray();
             if (! empty($dayIds)) {
                 WorkoutLog::whereIn('program_day_id', $dayIds)->delete();
             }
-            $Program->delete();
+            $program->delete();
         });
 
         return response()->noContent();
