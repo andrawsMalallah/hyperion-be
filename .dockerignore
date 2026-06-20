@@ -1,0 +1,16 @@
+.git
+.github
+.env
+.env.*
+vendor
+node_modules
+bootstrap/cache/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+Dockerfile
+.dockerignore
+docker
+tests
+phpunit.xml
