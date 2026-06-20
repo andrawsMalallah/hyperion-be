@@ -8,7 +8,7 @@ class WorkoutLog extends Model
 {
     protected $fillable = [
         'user_id',
-        'split_day_id',
+        'program_day_id',
         'date_timestamp',
     ];
 
@@ -23,7 +23,7 @@ class WorkoutLog extends Model
 
     public function day()
     {
-        return $this->belongsTo(SplitDay::class, 'split_day_id');
+        return $this->belongsTo(ProgramDay::class, 'program_day_id');
     }
 
     public function sets()

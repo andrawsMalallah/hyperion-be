@@ -1,10 +1,10 @@
 <?php
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Database\QueryException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,8 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (QueryException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
-                    'message' => config('app.debug') 
-                        ? $e->getMessage() 
+                    'message' => config('app.debug')
+                        ? $e->getMessage()
                         : 'An unexpected database error occurred. Please try again later.',
                 ], 500);
             }
@@ -35,8 +35,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (PDOException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
-                    'message' => config('app.debug') 
-                        ? $e->getMessage() 
+                    'message' => config('app.debug')
+                        ? $e->getMessage()
                         : 'A connection error occurred. Please try again later.',
                 ], 500);
             }

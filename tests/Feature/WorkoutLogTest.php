@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\WorkoutLog;
 use App\Models\Exercise;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
+use Tests\TestCase;
 
 class WorkoutLogTest extends TestCase
 {
@@ -27,9 +26,9 @@ class WorkoutLogTest extends TestCase
                     'weight' => 100,
                     'reps' => 10,
                     'rpe' => 8,
-                    'set_order' => 1
-                ]
-            ]
+                    'set_order' => 1,
+                ],
+            ],
         ]);
 
         $response->assertStatus(201);

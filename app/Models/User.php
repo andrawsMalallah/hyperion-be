@@ -31,9 +31,9 @@ class User extends Authenticatable
         ];
     }
 
-    public function splits()
+    public function programs()
     {
-        return $this->hasMany(Split::class);
+        return $this->hasMany(Program::class);
     }
 
     public function workoutLogs()

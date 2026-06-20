@@ -11,10 +11,10 @@ class WorkoutLogResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'split_day_id' => $this->split_day_id,
+            'program_day_id' => $this->program_day_id,
             'date_timestamp' => $this->date_timestamp,
             'sets' => SetLogResource::collection($this->whenLoaded('sets')),
-            'day' => new SplitDayResource($this->whenLoaded('day')),
+            'day' => new ProgramDayResource($this->whenLoaded('day')),
             'created_at' => $this->created_at,
         ];
     }

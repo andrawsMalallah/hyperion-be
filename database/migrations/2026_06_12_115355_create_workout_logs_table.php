@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('workout_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('split_day_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('program_day_id')->nullable()->constrained('program_days')->nullOnDelete();
             $table->timestamp('date_timestamp');
             $table->timestamps();
         });

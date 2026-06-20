@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Exercise;
-use App\Http\Resources\ExerciseResource;
 use App\Http\Requests\StoreExerciseRequest;
+use App\Http\Resources\ExerciseResource;
+use App\Models\Exercise;
+use Illuminate\Http\Request;
 
 class ExerciseController extends Controller
 {
@@ -17,10 +17,12 @@ class ExerciseController extends Controller
         $search = $request->query('search');
         $query = Exercise::query();
 
+        $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('target_muscle_group', 'like', '%' . $search . '%');
+            $query->where(function ($q) use ($search, $operator) {
+                $q->where('name', $operator, '%'.$search.'%')
+                    ->orWhere('target_muscle_group', $operator, '%'.$search.'%');
             });
         }
 
@@ -32,10 +34,10 @@ class ExerciseController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-     public function store(StoreExerciseRequest $request)
-     {
-         $exercise = Exercise::create($request->validated());
- 
-         return new ExerciseResource($exercise);
-     }
- }
+    public function store(StoreExerciseRequest $request)
+    {
+        $exercise = Exercise::create($request->validated());
+
+        return new ExerciseResource($exercise);
+    }
+}

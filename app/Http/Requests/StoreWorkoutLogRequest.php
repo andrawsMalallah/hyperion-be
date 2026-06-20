@@ -23,7 +23,7 @@ class StoreWorkoutLogRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'split_day_id' => 'nullable|exists:split_days,id',
+            'program_day_id' => 'nullable|exists:program_days,id',
             'date_timestamp' => 'required|date',
             'sets' => 'sometimes|array',
             'sets.*.exercise_id' => 'required|exists:exercises,id',

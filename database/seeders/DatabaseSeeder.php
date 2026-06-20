@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Artisan;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,7 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         // Automatically create a personal access client if one doesn't exist
         // This prevents the "Personal access client not found" error when migrating fresh
-        \Illuminate\Support\Facades\Artisan::call('passport:client', [
+        Artisan::call('passport:client', [
             '--personal' => true,
             '--name' => 'Hyperion Personal Access Client',
             '--no-interaction' => true,

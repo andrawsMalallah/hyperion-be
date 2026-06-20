@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\WorkoutLog;
 use App\Http\Requests\StoreWorkoutLogRequest;
 use App\Http\Resources\WorkoutLogResource;
+use App\Models\WorkoutLog;
 use Illuminate\Http\Request;
 
 class WorkoutLogController extends Controller
@@ -12,10 +12,11 @@ class WorkoutLogController extends Controller
     public function index(Request $request)
     {
         $logs = $request->user()->workoutLogs()
-            ->with(['day.split', 'sets.exercise'])
+            ->with(['day.program', 'sets.exercise'])
             ->orderByDesc('date_timestamp')
             ->paginate(30);
-        return WorkoutLogResource::collection($logs);   
+
+        return WorkoutLogResource::collection($logs);
     }
 
     public function store(StoreWorkoutLogRequest $request)
@@ -28,7 +29,7 @@ class WorkoutLogController extends Controller
             }
         }
 
-        return new WorkoutLogResource($workout->load(['day.split', 'sets.exercise']));
+        return new WorkoutLogResource($workout->load(['day.program', 'sets.exercise']));
     }
 
     public function show(Request $request, WorkoutLog $workoutLog)
@@ -36,7 +37,8 @@ class WorkoutLogController extends Controller
         if ($request->user()->id !== $workoutLog->user_id) {
             abort(403);
         }
-        return new WorkoutLogResource($workoutLog->load(['day.split', 'sets.exercise']));
+
+        return new WorkoutLogResource($workoutLog->load(['day.program', 'sets.exercise']));
     }
 
     public function destroy(Request $request, WorkoutLog $workoutLog)
@@ -45,6 +47,7 @@ class WorkoutLogController extends Controller
             abort(403);
         }
         $workoutLog->delete();
+
         return response()->noContent();
     }
 }

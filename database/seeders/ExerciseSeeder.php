@@ -212,7 +212,7 @@ class ExerciseSeeder extends Seeder
             ['name' => 'Snatch', 'target_muscle_group' => 'Full Body', 'mechanics_type' => 'Compound'],
             ['name' => 'Kettlebell Swing', 'target_muscle_group' => 'Full Body', 'mechanics_type' => 'Compound'],
             ['name' => 'Burpee', 'target_muscle_group' => 'Full Body', 'mechanics_type' => 'Compound'],
-            ['name' => 'Thruster', 'target_muscle_group' => 'Full Body', 'mechanics_type' => 'Compound']
+            ['name' => 'Thruster', 'target_muscle_group' => 'Full Body', 'mechanics_type' => 'Compound'],
         ];
 
         foreach ($exercises as $exercise) {

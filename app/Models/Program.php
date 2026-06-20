@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Split extends Model
+class Program extends Model
 {
     protected $fillable = [
         'user_id',
-        'split_name',
+        'name',
         'is_active',
     ];
 
@@ -23,6 +23,6 @@ class Split extends Model
 
     public function days()
     {
-        return $this->hasMany(SplitDay::class)->orderBy('display_order');
+        return $this->hasMany(ProgramDay::class)->orderBy('display_order');
     }
 }
