@@ -37,7 +37,7 @@ class UserSettingController extends Controller
 
         $validated = $request->validate([
             'timer_enabled' => 'sometimes|boolean',
-            'default_rest_time' => 'sometimes|integer|min:0',
+            'default_rest_time' => 'sometimes|integer|min:0|max:600',
             'weight_unit' => 'sometimes|string|in:kg,lbs',
         ]);
 

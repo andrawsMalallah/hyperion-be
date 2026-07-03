@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Program;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
@@ -31,7 +30,7 @@ class ProgramTest extends TestCase
         $user = User::factory()->create();
         Passport::actingAs($user);
 
-        Program::create(['user_id' => $user->id, 'name' => 'Bro Program', 'is_active' => false]);
+        $user->programs()->create(['name' => 'Bro Program', 'is_active' => false]);
 
         $response = $this->getJson('/api/programs');
 
@@ -46,8 +45,8 @@ class ProgramTest extends TestCase
 
         Passport::actingAs($user1);
 
-        Program::create(['user_id' => $user1->id, 'name' => 'Upper Body Program', 'is_active' => true]);
-        Program::create(['user_id' => $user2->id, 'name' => 'Lower Body Program', 'is_active' => false]);
+        $user1->programs()->create(['name' => 'Upper Body Program', 'is_active' => true]);
+        $user2->programs()->create(['name' => 'Lower Body Program', 'is_active' => false]);
 
         $response = $this->getJson('/api/programs/discover');
 
@@ -57,11 +56,12 @@ class ProgramTest extends TestCase
                 'data' => [
                     '*' => [
                         'id', 'name', 'is_active', 'created_at', 'days',
-                        'user' => ['id', 'name', 'email'],
+                        'user' => ['id', 'name'],
                     ],
                 ],
                 'meta' => ['current_page', 'last_page', 'per_page', 'total'],
-            ]);
+            ])
+            ->assertJsonMissingPath('data.0.user.email');
     }
 
     public function test_user_can_search_discovered_programs()
@@ -71,8 +71,8 @@ class ProgramTest extends TestCase
 
         Passport::actingAs($user1);
 
-        Program::create(['user_id' => $user1->id, 'name' => 'Push Pull Legs', 'is_active' => true]);
-        Program::create(['user_id' => $user2->id, 'name' => 'Arnold Program', 'is_active' => false]);
+        $user1->programs()->create(['name' => 'Push Pull Legs', 'is_active' => true]);
+        $user2->programs()->create(['name' => 'Arnold Program', 'is_active' => false]);
 
         // Search for "Push"
         $response = $this->getJson('/api/programs/discover?search=Push');
@@ -103,8 +103,8 @@ class ProgramTest extends TestCase
         $user = User::factory()->create();
         Passport::actingAs($user);
 
-        $Program1 = Program::create(['user_id' => $user->id, 'name' => 'Bro Program', 'is_active' => true]);
-        $Program2 = Program::create(['user_id' => $user->id, 'name' => 'Arnold Program', 'is_active' => false]);
+        $Program1 = $user->programs()->create(['name' => 'Bro Program', 'is_active' => true]);
+        $Program2 = $user->programs()->create(['name' => 'Arnold Program', 'is_active' => false]);
 
         $response = $this->putJson("/api/programs/{$Program2->id}", [
             'is_active' => true,

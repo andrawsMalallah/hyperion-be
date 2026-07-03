@@ -19,10 +19,10 @@ class StoreProgramRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'is_active' => 'boolean',
-            'days' => 'sometimes|array',
+            'days' => 'sometimes|array|max:14',
             'days.*.day_name' => 'required|string|max:255',
-            'days.*.display_order' => 'integer',
-            'days.*.exercises' => 'sometimes|array',
+            'days.*.display_order' => 'integer|min:0',
+            'days.*.exercises' => 'sometimes|array|max:30',
             'days.*.exercises.*.exercise_id' => 'required|exists:exercises,id',
         ];
     }

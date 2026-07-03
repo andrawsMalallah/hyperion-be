@@ -55,6 +55,15 @@ class AuthController extends Controller
         ]);
     }
 
+    public function logoutAll(Request $request)
+    {
+        $request->user()->tokens()->update(['revoked' => true]);
+
+        return response()->json([
+            'message' => 'Logged out on all devices.',
+        ]);
+    }
+
     public function user(Request $request)
     {
         return new UserResource($request->user());

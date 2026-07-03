@@ -10,10 +10,12 @@ class ForgotPasswordController extends Controller
 {
     public function sendResetLinkEmail(ForgotPasswordRequest $request)
     {
-        $status = Password::sendResetLink($request->only('email'));
+        // Always respond identically so the endpoint can't be used to
+        // discover which email addresses are registered.
+        Password::sendResetLink($request->only('email'));
 
-        return $status === Password::RESET_LINK_SENT
-                    ? response()->json(['message' => __($status)])
-                    : response()->json(['message' => __($status)], 400);
+        return response()->json([
+            'message' => 'If an account exists for that email, a password reset link has been sent.',
+        ]);
     }
 }

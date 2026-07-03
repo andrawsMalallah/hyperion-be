@@ -25,12 +25,12 @@ class StoreWorkoutLogRequest extends FormRequest
         return [
             'program_day_id' => 'nullable|exists:program_days,id',
             'date_timestamp' => 'required|date',
-            'sets' => 'sometimes|array',
+            'sets' => 'sometimes|array|max:200',
             'sets.*.exercise_id' => 'required|exists:exercises,id',
-            'sets.*.weight' => 'required|numeric|min:1',
-            'sets.*.reps' => 'required|integer|min:1',
-            'sets.*.rpe' => 'nullable|integer|min:1',
-            'sets.*.set_order' => 'required|integer',
+            'sets.*.weight' => 'required|numeric|min:1|max:1500',
+            'sets.*.reps' => 'required|integer|min:1|max:100',
+            'sets.*.rpe' => 'nullable|integer|min:1|max:10',
+            'sets.*.set_order' => 'required|integer|min:0',
         ];
     }
 
@@ -47,6 +47,9 @@ class StoreWorkoutLogRequest extends FormRequest
             'sets.*.reps.integer' => 'The reps must be an integer.',
             'sets.*.reps.min' => 'The reps must be at least 1.',
             'sets.*.rpe.min' => 'The RPE must be at least 1.',
+            'sets.*.rpe.max' => 'The RPE cannot be greater than 10.',
+            'sets.*.weight.max' => 'The weight cannot be greater than 1500.',
+            'sets.*.reps.max' => 'The reps cannot be greater than 100.',
         ];
     }
 }
