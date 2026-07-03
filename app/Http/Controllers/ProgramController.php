@@ -16,7 +16,7 @@ class ProgramController extends Controller
     {
         $search = $request->query('search');
 
-        $query = Program::with(['user', 'days.exercises']);
+        $query = Program::with(['user', 'days.exercises'])->where('is_public', true);
 
         $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 

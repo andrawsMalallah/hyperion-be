@@ -19,6 +19,7 @@ class StoreProgramRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'is_active' => 'boolean',
+            'is_public' => 'boolean',
             'days' => 'sometimes|array|max:14',
             'days.*.day_name' => 'required|string|max:255',
             'days.*.display_order' => 'integer|min:0',

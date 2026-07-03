@@ -2,49 +2,35 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateUserSettingRequest;
+use App\Models\UserSetting;
 use Illuminate\Http\Request;
 
 class UserSettingController extends Controller
 {
     public function show(Request $request)
     {
-        $settings = $request->user()->settings;
+        return response()->json([
+            'data' => $this->settingsFor($request),
+        ]);
+    }
 
-        if (! $settings) {
-            $settings = $request->user()->settings()->create([
-                'timer_enabled' => true,
-                'default_rest_time' => 90,
-                'weight_unit' => 'kg',
-            ]);
-        }
+    public function update(UpdateUserSettingRequest $request)
+    {
+        $settings = $this->settingsFor($request);
+        $settings->update($request->validated());
 
         return response()->json([
             'data' => $settings,
         ]);
     }
 
-    public function update(Request $request)
+    private function settingsFor(Request $request): UserSetting
     {
-        $settings = $request->user()->settings;
-
-        if (! $settings) {
-            $settings = $request->user()->settings()->create([
-                'timer_enabled' => true,
-                'default_rest_time' => 90,
-                'weight_unit' => 'kg',
-            ]);
-        }
-
-        $validated = $request->validate([
-            'timer_enabled' => 'sometimes|boolean',
-            'default_rest_time' => 'sometimes|integer|min:0|max:600',
-            'weight_unit' => 'sometimes|string|in:kg,lbs',
-        ]);
-
-        $settings->update($validated);
-
-        return response()->json([
-            'data' => $settings,
+        return $request->user()->settings ?? $request->user()->settings()->create([
+            'timer_enabled' => true,
+            'default_rest_time' => 90,
+            'weight_unit' => 'kg',
         ]);
     }
 }

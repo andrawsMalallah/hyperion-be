@@ -26,6 +26,7 @@ class UpdateProgramRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'is_active' => 'boolean',
+            'is_public' => 'boolean',
             'days' => 'sometimes|array|max:14',
             'days.*.id' => [
                 'nullable',

@@ -9,10 +9,16 @@ class Program extends Model
     protected $fillable = [
         'name',
         'is_active',
+        'is_public',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_public' => 'boolean',
+    ];
+
+    protected $attributes = [
+        'is_public' => true,
     ];
 
     public function user()

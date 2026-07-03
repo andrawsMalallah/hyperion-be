@@ -99,6 +99,23 @@ class ProgramTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
+    public function test_private_programs_are_hidden_from_discover()
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+
+        Passport::actingAs($user1);
+
+        $user2->programs()->create(['name' => 'Public Program', 'is_active' => false, 'is_public' => true]);
+        $user2->programs()->create(['name' => 'Secret Program', 'is_active' => false, 'is_public' => false]);
+
+        $response = $this->getJson('/api/programs/discover');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Public Program');
+    }
+
     public function test_program_stores_and_returns_exercise_prescriptions()
     {
         $user = User::factory()->create();

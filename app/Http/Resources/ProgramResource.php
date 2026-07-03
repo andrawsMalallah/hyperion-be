@@ -13,6 +13,7 @@ class ProgramResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'is_active' => $this->is_active,
+            'is_public' => $this->is_public,
             'user' => new PublicUserResource($this->whenLoaded('user')),
             'days' => ProgramDayResource::collection($this->whenLoaded('days')),
             'created_at' => $this->created_at,
