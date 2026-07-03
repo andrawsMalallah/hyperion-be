@@ -17,6 +17,12 @@ class ExerciseController extends Controller
         $search = $request->query('search');
         $query = Exercise::query();
 
+        // Approved catalog plus the requester's own pending contributions.
+        $query->where(function ($q) use ($request) {
+            $q->where('status', 'approved')
+                ->orWhere('created_by', $request->user()->id);
+        });
+
         $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         if ($search) {
@@ -36,7 +42,11 @@ class ExerciseController extends Controller
      */
     public function store(StoreExerciseRequest $request)
     {
-        $exercise = Exercise::create($request->validated());
+        $exercise = Exercise::create([
+            ...$request->validated(),
+            'created_by' => $request->user()->id,
+            'status' => 'pending',
+        ]);
 
         return new ExerciseResource($exercise);
     }

@@ -9,10 +9,13 @@ class WorkoutLog extends Model
     protected $fillable = [
         'program_day_id',
         'date_timestamp',
+        'ended_at',
+        'notes',
     ];
 
     protected $casts = [
         'date_timestamp' => 'datetime',
+        'ended_at' => 'datetime',
     ];
 
     public function user()

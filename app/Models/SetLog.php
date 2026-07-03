@@ -12,6 +12,7 @@ class SetLog extends Model
         'weight',
         'reps',
         'rpe',
+        'set_type',
         'set_order',
     ];
 

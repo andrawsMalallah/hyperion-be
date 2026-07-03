@@ -25,11 +25,14 @@ class StoreWorkoutLogRequest extends FormRequest
         return [
             'program_day_id' => 'nullable|exists:program_days,id',
             'date_timestamp' => 'required|date',
+            'ended_at' => 'nullable|date',
+            'notes' => 'nullable|string|max:1000',
             'sets' => 'sometimes|array|max:200',
             'sets.*.exercise_id' => 'required|exists:exercises,id',
-            'sets.*.weight' => 'required|numeric|min:1|max:1500',
+            'sets.*.weight' => 'required|numeric|min:0|max:1500',
             'sets.*.reps' => 'required|integer|min:1|max:100',
             'sets.*.rpe' => 'nullable|integer|min:1|max:10',
+            'sets.*.set_type' => 'nullable|string|in:warmup,working',
             'sets.*.set_order' => 'required|integer|min:0',
         ];
     }
@@ -42,7 +45,7 @@ class StoreWorkoutLogRequest extends FormRequest
             'sets.*.exercise_id.exists' => 'The selected exercise does not exist.',
             'sets.*.weight.required' => 'The weight field is required.',
             'sets.*.weight.numeric' => 'The weight must be a number.',
-            'sets.*.weight.min' => 'The weight must be at least 1.',
+            'sets.*.weight.min' => 'The weight cannot be negative.',
             'sets.*.reps.required' => 'The reps field is required.',
             'sets.*.reps.integer' => 'The reps must be an integer.',
             'sets.*.reps.min' => 'The reps must be at least 1.',

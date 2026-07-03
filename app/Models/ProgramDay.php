@@ -20,7 +20,7 @@ class ProgramDay extends Model
     public function exercises()
     {
         return $this->belongsToMany(Exercise::class, 'day_exercise')
-            ->withPivot('display_order')
+            ->withPivot(['display_order', 'target_sets', 'rep_range_min', 'rep_range_max', 'target_rpe', 'rest_seconds', 'notes'])
             ->orderBy('pivot_display_order');
     }
 }

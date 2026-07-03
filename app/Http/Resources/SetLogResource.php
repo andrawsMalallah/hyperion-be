@@ -15,6 +15,7 @@ class SetLogResource extends JsonResource
             'weight' => $this->weight,
             'reps' => $this->reps,
             'rpe' => $this->rpe,
+            'set_type' => $this->set_type,
             'set_order' => $this->set_order,
             'exercise' => new ExerciseResource($this->whenLoaded('exercise')),
         ];

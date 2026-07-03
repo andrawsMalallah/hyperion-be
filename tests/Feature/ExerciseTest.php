@@ -25,6 +25,31 @@ class ExerciseTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_user_contributions_are_pending_and_hidden_from_others()
+    {
+        $contributor = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        Passport::actingAs($contributor);
+        $response = $this->postJson('/api/exercises', [
+            'name' => 'My Special Curl',
+            'target_muscle_group' => 'Biceps',
+            'mechanics_type' => 'Isolation',
+        ]);
+        $response->assertStatus(201)->assertJsonPath('data.status', 'pending');
+
+        // Contributor sees their own pending exercise.
+        $this->getJson('/api/exercises?search=Special')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+
+        // Other users don't, until it's approved.
+        Passport::actingAs($otherUser);
+        $this->getJson('/api/exercises?search=Special')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    }
+
     public function test_exercises_are_paginated_and_searchable()
     {
         $user = User::factory()->create();

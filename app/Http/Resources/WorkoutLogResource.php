@@ -13,6 +13,8 @@ class WorkoutLogResource extends JsonResource
             'id' => $this->id,
             'program_day_id' => $this->program_day_id,
             'date_timestamp' => $this->date_timestamp,
+            'ended_at' => $this->ended_at,
+            'notes' => $this->notes,
             'sets' => SetLogResource::collection($this->whenLoaded('sets')),
             'day' => new ProgramDayResource($this->whenLoaded('day')),
             'created_at' => $this->created_at,

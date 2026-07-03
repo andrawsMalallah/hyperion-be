@@ -36,6 +36,35 @@ class WorkoutLogTest extends TestCase
         $this->assertDatabaseHas('set_logs', ['weight' => 100, 'reps' => 10]);
     }
 
+    public function test_workout_log_accepts_bodyweight_warmup_sets_and_session_metadata()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $exercise = Exercise::create(['name' => 'Plank', 'target_muscle_group' => 'Core', 'mechanics_type' => 'Isolation']);
+
+        $start = now()->subMinutes(45);
+        $response = $this->postJson('/api/workout-logs', [
+            'date_timestamp' => $start->toISOString(),
+            'ended_at' => now()->toISOString(),
+            'notes' => 'Felt strong today.',
+            'sets' => [
+                [
+                    'exercise_id' => $exercise->id,
+                    'weight' => 0,
+                    'reps' => 1,
+                    'set_type' => 'warmup',
+                    'set_order' => 1,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.notes', 'Felt strong today.')
+            ->assertJsonPath('data.sets.0.set_type', 'warmup');
+        $this->assertDatabaseHas('set_logs', ['weight' => 0, 'set_type' => 'warmup']);
+        $this->assertDatabaseHas('workout_logs', ['notes' => 'Felt strong today.']);
+    }
+
     public function test_workout_log_rejects_out_of_range_set_values()
     {
         $user = User::factory()->create();

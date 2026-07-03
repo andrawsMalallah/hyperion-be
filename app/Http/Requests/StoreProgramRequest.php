@@ -24,6 +24,12 @@ class StoreProgramRequest extends FormRequest
             'days.*.display_order' => 'integer|min:0',
             'days.*.exercises' => 'sometimes|array|max:30',
             'days.*.exercises.*.exercise_id' => 'required|exists:exercises,id',
+            'days.*.exercises.*.target_sets' => 'nullable|integer|min:1|max:20',
+            'days.*.exercises.*.rep_range_min' => 'nullable|integer|min:1|max:100',
+            'days.*.exercises.*.rep_range_max' => 'nullable|integer|min:1|max:100|gte:days.*.exercises.*.rep_range_min',
+            'days.*.exercises.*.target_rpe' => 'nullable|integer|min:1|max:10',
+            'days.*.exercises.*.rest_seconds' => 'nullable|integer|min:0|max:600',
+            'days.*.exercises.*.notes' => 'nullable|string|max:500',
         ];
     }
 

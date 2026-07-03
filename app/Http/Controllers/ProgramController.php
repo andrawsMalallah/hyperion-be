@@ -72,7 +72,15 @@ class ProgramController extends Controller
                     if (isset($dayData['exercises'])) {
                         $exercises = [];
                         foreach ($dayData['exercises'] as $index => $exerciseData) {
-                            $exercises[$exerciseData['exercise_id']] = ['display_order' => $index];
+                            $exercises[$exerciseData['exercise_id']] = [
+                                'display_order' => $index,
+                                'target_sets' => $exerciseData['target_sets'] ?? null,
+                                'rep_range_min' => $exerciseData['rep_range_min'] ?? null,
+                                'rep_range_max' => $exerciseData['rep_range_max'] ?? null,
+                                'target_rpe' => $exerciseData['target_rpe'] ?? null,
+                                'rest_seconds' => $exerciseData['rest_seconds'] ?? null,
+                                'notes' => $exerciseData['notes'] ?? null,
+                            ];
                         }
                         $day->exercises()->sync($exercises);
                     }
@@ -133,7 +141,15 @@ class ProgramController extends Controller
                     if (isset($dayData['exercises'])) {
                         $exercises = [];
                         foreach ($dayData['exercises'] as $index => $exerciseData) {
-                            $exercises[$exerciseData['exercise_id']] = ['display_order' => $index];
+                            $exercises[$exerciseData['exercise_id']] = [
+                                'display_order' => $index,
+                                'target_sets' => $exerciseData['target_sets'] ?? null,
+                                'rep_range_min' => $exerciseData['rep_range_min'] ?? null,
+                                'rep_range_max' => $exerciseData['rep_range_max'] ?? null,
+                                'target_rpe' => $exerciseData['target_rpe'] ?? null,
+                                'rest_seconds' => $exerciseData['rest_seconds'] ?? null,
+                                'notes' => $exerciseData['notes'] ?? null,
+                            ];
                         }
                         $day->exercises()->sync($exercises);
                     } else {

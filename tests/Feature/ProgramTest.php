@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Exercise;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
@@ -96,6 +97,70 @@ class ProgramTest extends TestCase
         $response = $this->getJson('/api/programs/discover?search=Cardio');
         $response->assertStatus(200)
             ->assertJsonCount(0, 'data');
+    }
+
+    public function test_program_stores_and_returns_exercise_prescriptions()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $exercise = Exercise::create([
+            'name' => 'Bench Press',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound',
+        ]);
+
+        $response = $this->postJson('/api/programs', [
+            'name' => 'PPL',
+            'days' => [
+                [
+                    'day_name' => 'Push',
+                    'display_order' => 1,
+                    'exercises' => [
+                        [
+                            'exercise_id' => $exercise->id,
+                            'target_sets' => 3,
+                            'rep_range_min' => 8,
+                            'rep_range_max' => 12,
+                            'target_rpe' => 8,
+                            'rest_seconds' => 120,
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.target_sets', 3)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rep_range_min', 8)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rep_range_max', 12)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rest_seconds', 120);
+    }
+
+    public function test_program_rejects_inverted_rep_range()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $exercise = Exercise::create([
+            'name' => 'Bench Press',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound',
+        ]);
+
+        $response = $this->postJson('/api/programs', [
+            'name' => 'PPL',
+            'days' => [
+                [
+                    'day_name' => 'Push',
+                    'exercises' => [
+                        ['exercise_id' => $exercise->id, 'rep_range_min' => 12, 'rep_range_max' => 8],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['days.0.exercises.0.rep_range_max']);
     }
 
     public function test_activating_a_program_deactivates_other_programs()
