@@ -21,7 +21,23 @@ class WorkoutLogController extends Controller
 
     public function store(StoreWorkoutLogRequest $request)
     {
-        $workout = $request->user()->workoutLogs()->create($request->validated());
+        $data = $request->validated();
+
+        // Idempotent replay: an offline-queued workout may be uploaded more
+        // than once (e.g. the first response never made it back). If we
+        // already stored this client_uuid for this user, return the existing
+        // record instead of creating a duplicate.
+        if (! empty($data['client_uuid'])) {
+            $existing = $request->user()->workoutLogs()
+                ->where('client_uuid', $data['client_uuid'])
+                ->first();
+
+            if ($existing) {
+                return new WorkoutLogResource($existing->load(['day.program', 'sets.exercise']));
+            }
+        }
+
+        $workout = $request->user()->workoutLogs()->create($data);
 
         if ($request->has('sets')) {
             foreach ($request->sets as $setData) {

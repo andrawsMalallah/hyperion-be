@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class WorkoutLog extends Model
 {
     protected $fillable = [
+        'client_uuid',
         'program_day_id',
         'date_timestamp',
         'ended_at',

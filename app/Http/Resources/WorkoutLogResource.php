@@ -11,6 +11,7 @@ class WorkoutLogResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'client_uuid' => $this->client_uuid,
             'program_day_id' => $this->program_day_id,
             'date_timestamp' => $this->date_timestamp,
             'ended_at' => $this->ended_at,

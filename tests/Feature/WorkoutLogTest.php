@@ -65,6 +65,37 @@ class WorkoutLogTest extends TestCase
         $this->assertDatabaseHas('workout_logs', ['notes' => 'Felt strong today.']);
     }
 
+    public function test_resending_the_same_client_uuid_does_not_duplicate_the_workout()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $exercise = Exercise::create(['name' => 'Deadlift', 'target_muscle_group' => 'Back', 'mechanics_type' => 'Compound']);
+
+        $payload = [
+            'client_uuid' => '11111111-2222-4333-8444-555555555555',
+            'date_timestamp' => now()->toISOString(),
+            'sets' => [
+                [
+                    'exercise_id' => $exercise->id,
+                    'weight' => 140,
+                    'reps' => 5,
+                    'set_order' => 1,
+                ],
+            ],
+        ];
+
+        $first = $this->postJson('/api/workout-logs', $payload);
+        $first->assertStatus(201);
+
+        // A retry of the queued upload (lost response) must be idempotent.
+        $second = $this->postJson('/api/workout-logs', $payload);
+        $second->assertSuccessful()
+            ->assertJsonPath('data.id', $first->json('data.id'));
+
+        $this->assertDatabaseCount('workout_logs', 1);
+        $this->assertDatabaseCount('set_logs', 1);
+    }
+
     public function test_workout_log_rejects_out_of_range_set_values()
     {
         $user = User::factory()->create();

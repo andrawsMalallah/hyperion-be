@@ -23,6 +23,7 @@ class StoreWorkoutLogRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_uuid' => 'nullable|uuid',
             'program_day_id' => 'nullable|exists:program_days,id',
             'date_timestamp' => 'required|date',
             'ended_at' => 'nullable|date',
