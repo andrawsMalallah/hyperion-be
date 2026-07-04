@@ -37,10 +37,36 @@ class StoreProgramRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'The Program name is required.',
+            'name.required' => 'The program name is required.',
             'days.*.day_name.required' => 'The day name is required.',
             'days.*.exercises.*.exercise_id.required' => 'Each selected exercise is required.',
             'days.*.exercises.*.exercise_id.exists' => 'The selected exercise does not exist.',
+            'days.*.exercises.*.target_sets.max' => 'Target sets must be between 1 and 20.',
+            'days.*.exercises.*.target_sets.min' => 'Target sets must be between 1 and 20.',
+            'days.*.exercises.*.rep_range_min.min' => 'Reps must be at least 1.',
+            'days.*.exercises.*.rep_range_max.gte' => 'Maximum reps must be greater than or equal to minimum reps.',
+            'days.*.exercises.*.target_rpe.max' => 'Target RPE must be between 1 and 10.',
+            'days.*.exercises.*.target_rpe.min' => 'Target RPE must be between 1 and 10.',
+            'days.*.exercises.*.rest_seconds.max' => 'Rest time must be between 0 and 600 seconds.',
+        ];
+    }
+
+    /**
+     * Human-readable field names so nested errors don't surface raw paths
+     * like "days.0.exercises.0.target_rpe".
+     */
+    public function attributes(): array
+    {
+        return [
+            'name' => 'program name',
+            'days.*.day_name' => 'day name',
+            'days.*.exercises.*.exercise_id' => 'exercise',
+            'days.*.exercises.*.target_sets' => 'target sets',
+            'days.*.exercises.*.rep_range_min' => 'minimum reps',
+            'days.*.exercises.*.rep_range_max' => 'maximum reps',
+            'days.*.exercises.*.target_rpe' => 'target RPE',
+            'days.*.exercises.*.rest_seconds' => 'rest time',
+            'days.*.exercises.*.notes' => 'notes',
         ];
     }
 }

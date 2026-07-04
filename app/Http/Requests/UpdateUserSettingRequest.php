@@ -28,4 +28,25 @@ class UpdateUserSettingRequest extends FormRequest
             'weight_unit' => 'sometimes|string|in:kg,lbs',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'default_rest_time.max' => 'The default rest time must be between 0 and 600 seconds.',
+            'default_rest_time.min' => 'The default rest time must be between 0 and 600 seconds.',
+            'weight_unit.in' => 'The weight unit must be either kg or lbs.',
+        ];
+    }
+
+    /**
+     * Human-readable field names in place of the raw snake_case keys.
+     */
+    public function attributes(): array
+    {
+        return [
+            'timer_enabled' => 'rest timer',
+            'default_rest_time' => 'default rest time',
+            'weight_unit' => 'weight unit',
+        ];
+    }
 }

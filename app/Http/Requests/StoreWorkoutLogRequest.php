@@ -54,6 +54,28 @@ class StoreWorkoutLogRequest extends FormRequest
             'sets.*.rpe.max' => 'The RPE cannot be greater than 10.',
             'sets.*.weight.max' => 'The weight cannot be greater than 1500.',
             'sets.*.reps.max' => 'The reps cannot be greater than 100.',
+            'sets.*.set_type.in' => 'The set type must be either warm-up or working.',
+            'sets.*.set_order.min' => 'The set order cannot be negative.',
+        ];
+    }
+
+    /**
+     * Human-readable field names so nested errors don't surface raw paths
+     * like "sets.0.set_order".
+     */
+    public function attributes(): array
+    {
+        return [
+            'date_timestamp' => 'workout date',
+            'ended_at' => 'end time',
+            'program_day_id' => 'program day',
+            'client_uuid' => 'sync id',
+            'sets.*.exercise_id' => 'exercise',
+            'sets.*.weight' => 'weight',
+            'sets.*.reps' => 'reps',
+            'sets.*.rpe' => 'RPE',
+            'sets.*.set_type' => 'set type',
+            'sets.*.set_order' => 'set order',
         ];
     }
 }

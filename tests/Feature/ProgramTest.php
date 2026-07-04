@@ -180,6 +180,38 @@ class ProgramTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['days.0.exercises.0.rep_range_max']);
     }
 
+    public function test_program_validation_errors_are_human_readable()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $exercise = Exercise::create([
+            'name' => 'Bench Press',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound',
+        ]);
+
+        $response = $this->postJson('/api/programs', [
+            'name' => 'PPL',
+            'days' => [
+                [
+                    'day_name' => 'Push',
+                    'exercises' => [
+                        ['exercise_id' => $exercise->id, 'target_rpe' => 11],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        // The error key is a literal dotted string, so fetch the bag and index it.
+        $errors = $response->json('errors');
+        $message = $errors['days.0.exercises.0.target_rpe'][0];
+        $this->assertStringContainsStringIgnoringCase('RPE', $message);
+        // The raw field path must not leak into the user-facing message.
+        $this->assertStringNotContainsString('days.0.exercises.0.target_rpe', $message);
+    }
+
     public function test_program_days_expose_last_performed_at()
     {
         $user = User::factory()->create();
