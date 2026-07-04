@@ -23,4 +23,9 @@ class ProgramDay extends Model
             ->withPivot(['display_order', 'target_sets', 'rep_range_min', 'rep_range_max', 'target_rpe', 'rest_seconds', 'notes'])
             ->orderBy('pivot_display_order');
     }
+
+    public function workoutLogs()
+    {
+        return $this->hasMany(WorkoutLog::class, 'program_day_id');
+    }
 }

@@ -180,6 +180,28 @@ class ProgramTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['days.0.exercises.0.rep_range_max']);
     }
 
+    public function test_program_days_expose_last_performed_at()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $program = $user->programs()->create(['name' => 'Upper / Lower', 'is_active' => true]);
+        $trained = $program->days()->create(['day_name' => 'Upper 1', 'display_order' => 1]);
+        $program->days()->create(['day_name' => 'Lower 1', 'display_order' => 2]);
+
+        $user->workoutLogs()->create([
+            'program_day_id' => $trained->id,
+            'date_timestamp' => now()->subDay(),
+        ]);
+
+        $response = $this->getJson('/api/programs');
+
+        $response->assertStatus(200);
+        // Days come back ordered by display_order: [0] trained, [1] untrained.
+        $this->assertNotNull($response->json('data.0.days.0.last_performed_at'));
+        $this->assertNull($response->json('data.0.days.1.last_performed_at'));
+    }
+
     public function test_activating_a_program_deactivates_other_programs()
     {
         $user = User::factory()->create();

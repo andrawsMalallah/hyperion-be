@@ -14,6 +14,7 @@ class ProgramDayResource extends JsonResource
             'program_id' => $this->program_id,
             'day_name' => $this->day_name,
             'display_order' => $this->display_order,
+            'last_performed_at' => $this->last_performed_at,
             'exercises' => ExerciseResource::collection($this->whenLoaded('exercises')),
             'program' => new ProgramResource($this->whenLoaded('program')),
         ];

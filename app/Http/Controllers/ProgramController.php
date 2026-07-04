@@ -12,6 +12,20 @@ use Illuminate\Http\Request;
 
 class ProgramController extends Controller
 {
+    /**
+     * Eager-load spec for a user's own program days: their exercises plus the
+     * most recent workout date (last_performed_at), used by the Home "Up next"
+     * suggestion so the client doesn't have to pull full history for it.
+     * Not used by discover() — other users' training activity stays private.
+     */
+    private function ownDaysWith(): array
+    {
+        return [
+            'days' => fn ($q) => $q->withMax('workoutLogs as last_performed_at', 'date_timestamp'),
+            'days.exercises',
+        ];
+    }
+
     public function discover(Request $request)
     {
         $search = $request->query('search');
@@ -43,7 +57,7 @@ class ProgramController extends Controller
     public function index(Request $request)
     {
         $programs = $request->user()->programs()
-            ->with('days.exercises')
+            ->with($this->ownDaysWith())
             ->orderBy('is_active', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -90,7 +104,7 @@ class ProgramController extends Controller
             return $program;
         });
 
-        return new ProgramResource($program->load('days.exercises'));
+        return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function show(Request $request, Program $program)
@@ -99,7 +113,7 @@ class ProgramController extends Controller
             abort(403);
         }
 
-        return new ProgramResource($program->load('days.exercises'));
+        return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function update(UpdateProgramRequest $request, Program $program)
@@ -159,7 +173,7 @@ class ProgramController extends Controller
             }
         });
 
-        return new ProgramResource($program->load('days.exercises'));
+        return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function getByDay(Request $request, $dayId)
@@ -170,7 +184,7 @@ class ProgramController extends Controller
             abort(403);
         }
 
-        return new ProgramResource($program->load('days.exercises'));
+        return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function destroy(Request $request, Program $program)
