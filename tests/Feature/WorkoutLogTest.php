@@ -122,4 +122,57 @@ class WorkoutLogTest extends TestCase
             'sets.0.set_order',
         ]);
     }
+
+    public function test_recent_sets_returns_last_session_and_best_e1rm()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+
+        // Older but heavier session (holds the all-time best).
+        $old = $user->workoutLogs()->create(['date_timestamp' => now()->subDays(7)]);
+        $old->sets()->create(['exercise_id' => $ex->id, 'weight' => 100, 'reps' => 5, 'set_order' => 1]);
+
+        // Most recent session (lighter).
+        $new = $user->workoutLogs()->create(['date_timestamp' => now()->subDay()]);
+        $new->sets()->create(['exercise_id' => $ex->id, 'weight' => 90, 'reps' => 8, 'set_order' => 1]);
+
+        $response = $this->getJson('/api/exercises/recent-sets?ids='.$ex->id);
+
+        $response->assertStatus(200);
+        $this->assertEquals(90, $response->json("data.{$ex->id}.last.0.weight"));
+        $this->assertEquals(8, $response->json("data.{$ex->id}.last.0.reps"));
+        // Best e1rm comes from 100x5: 100 * (1 + 5/30) ≈ 116.67.
+        $this->assertEqualsWithDelta(116.67, $response->json("data.{$ex->id}.best_e1rm"), 0.5);
+    }
+
+    public function test_exercise_logs_are_paginated_and_scoped_to_the_exercise()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Squat', 'target_muscle_group' => 'Legs', 'mechanics_type' => 'Compound']);
+        $other = Exercise::create(['name' => 'Curl', 'target_muscle_group' => 'Arms', 'mechanics_type' => 'Isolation']);
+
+        for ($i = 0; $i < 7; $i++) {
+            $log = $user->workoutLogs()->create(['date_timestamp' => now()->subDays($i)]);
+            $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 100 + $i, 'reps' => 5, 'set_order' => 1]);
+            // Another exercise in the same session must not leak into the results.
+            $log->sets()->create(['exercise_id' => $other->id, 'weight' => 20, 'reps' => 10, 'set_order' => 2]);
+        }
+
+        $page1 = $this->getJson("/api/exercises/{$ex->id}/logs?page=1");
+        $page1->assertStatus(200)
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('meta.total', 7)
+            ->assertJsonPath('meta.last_page', 2);
+
+        foreach ($page1->json('data') as $log) {
+            $this->assertCount(1, $log['sets']);
+            $this->assertEquals($ex->id, $log['sets'][0]['exercise_id']);
+        }
+
+        $this->getJson("/api/exercises/{$ex->id}/logs?page=2")
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+    }
 }
