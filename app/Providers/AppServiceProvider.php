@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Mail\BrevoApiTransport;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -28,6 +31,16 @@ class AppServiceProvider extends ServiceProvider
         Passport::tokensExpireIn(now()->addDays(15));
         Passport::refreshTokensExpireIn(now()->addDays(30));
         Passport::personalAccessTokensExpireIn(now()->addDays(30));
+
+        // Send mail through Brevo's HTTP API (mailer "brevo-api") so production
+        // isn't dependent on outbound SMTP, which Render's free tier blocks —
+        // a synchronous SMTP send there hangs until the request 504s.
+        Mail::extend('brevo-api', function (array $config) {
+            return new BrevoApiTransport(
+                app(Factory::class),
+                $config['key'] ?? '',
+            );
+        });
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
