@@ -37,7 +37,7 @@ class WorkoutLogController extends Controller
             ->values();
 
         if ($ids->isEmpty()) {
-            return response()->json(['data' => (object) []]);
+            return $this->dataResponse((object) []);
         }
 
         $userId = $request->user()->id;
@@ -90,7 +90,7 @@ class WorkoutLogController extends Controller
             ];
         }
 
-        return response()->json(['data' => $data]);
+        return $this->dataResponse($data);
     }
 
     /**

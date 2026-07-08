@@ -20,7 +20,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        $token = $user->createToken('auth_token')->accessToken;
+        $token = $user->createToken($this->deviceName($request))->accessToken;
 
         return response()->json([
             'user' => new UserResource($user),
@@ -33,12 +33,10 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Invalid login credentials.',
-            ], 401);
+            return $this->messageResponse('Invalid login credentials.', 401);
         }
 
-        $token = $user->createToken('auth_token')->accessToken;
+        $token = $user->createToken($this->deviceName($request))->accessToken;
 
         return response()->json([
             'user' => new UserResource($user),
@@ -50,22 +48,27 @@ class AuthController extends Controller
     {
         $request->user()->token()->revoke();
 
-        return response()->json([
-            'message' => 'Successfully logged out.',
-        ]);
+        return $this->messageResponse('Successfully logged out.');
     }
 
     public function logoutAll(Request $request)
     {
         $request->user()->tokens()->update(['revoked' => true]);
 
-        return response()->json([
-            'message' => 'Logged out on all devices.',
-        ]);
+        return $this->messageResponse('Logged out on all devices.');
     }
 
     public function user(Request $request)
     {
         return new UserResource($request->user());
+    }
+
+    /**
+     * The token name records the client's User-Agent so the Profile "Devices"
+     * screen can identify each session. Truncated to fit the oauth name column.
+     */
+    private function deviceName(Request $request): string
+    {
+        return substr($request->userAgent() ?: 'Unknown device', 0, 150);
     }
 }

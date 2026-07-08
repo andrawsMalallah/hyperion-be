@@ -20,11 +20,17 @@ class ResetPasswordController extends Controller
                 ])->setRememberToken(Str::random(60));
 
                 $user->save();
+
+                // A reset is the recovery path for a lost or compromised
+                // account, so every existing session must die — unlike the
+                // change-password flow, there's no "current" session to keep
+                // (the reset form is unauthenticated).
+                $user->tokens()->update(['revoked' => true]);
             }
         );
 
         return $status === Password::PASSWORD_RESET
-                    ? response()->json(['message' => __($status)])
-                    : response()->json(['message' => __($status)], 400);
+                    ? $this->messageResponse(__($status))
+                    : $this->messageResponse(__($status), 400);
     }
 }

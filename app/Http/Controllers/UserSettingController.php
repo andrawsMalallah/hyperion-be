@@ -10,9 +10,7 @@ class UserSettingController extends Controller
 {
     public function show(Request $request)
     {
-        return response()->json([
-            'data' => $this->settingsFor($request),
-        ]);
+        return $this->dataResponse($this->settingsFor($request));
     }
 
     public function update(UpdateUserSettingRequest $request)
@@ -20,9 +18,7 @@ class UserSettingController extends Controller
         $settings = $this->settingsFor($request);
         $settings->update($request->validated());
 
-        return response()->json([
-            'data' => $settings,
-        ]);
+        return $this->dataResponse($settings);
     }
 
     private function settingsFor(Request $request): UserSetting

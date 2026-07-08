@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreWorkoutLogRequest extends FormRequest
 {
@@ -24,7 +25,19 @@ class StoreWorkoutLogRequest extends FormRequest
     {
         return [
             'client_uuid' => 'nullable|uuid',
-            'program_day_id' => 'nullable|exists:program_days,id',
+            // Scope the day to the authenticated user: a program_day_id must
+            // belong to a program they own. Without the ownership constraint a
+            // user could attach a workout to someone else's private day and the
+            // response would leak that program back (IDOR).
+            'program_day_id' => [
+                'nullable',
+                Rule::exists('program_days', 'id')->where(function ($query) {
+                    $query->whereIn(
+                        'program_id',
+                        $this->user()->programs()->select('id')
+                    );
+                }),
+            ],
             'date_timestamp' => 'required|date',
             'ended_at' => 'nullable|date',
             'notes' => 'nullable|string|max:1000',

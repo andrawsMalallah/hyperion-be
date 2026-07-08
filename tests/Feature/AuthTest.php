@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Laravel\Passport\Client;
 use Tests\TestCase;
 
@@ -28,8 +30,8 @@ class AuthTest extends TestCase
         $response = $this->postJson('/api/register', [
             'name' => 'Test User',
             'email' => 'new@example.com',
-            'password' => 'super-secret-password',
-            'password_confirmation' => 'super-secret-password',
+            'password' => 'Super-Secret-Pass1!',
+            'password_confirmation' => 'Super-Secret-Pass1!',
         ]);
 
         $response->assertStatus(201)
@@ -115,6 +117,57 @@ class AuthTest extends TestCase
         $knownResponse->assertStatus(200);
         $unknownResponse->assertStatus(200);
         $this->assertSame($knownResponse->json('message'), $unknownResponse->json('message'));
+    }
+
+    public function test_reset_link_points_at_the_frontend_reset_page(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $this->postJson('/api/forgot-password', ['email' => $user->email])
+            ->assertStatus(200);
+
+        Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
+            $url = call_user_func($notification::$createUrlCallback, $user, $notification->token);
+
+            return str_starts_with($url, config('app.frontend_url').'/reset-password/'.$notification->token)
+                && str_contains($url, 'email='.urlencode($user->email));
+        });
+    }
+
+    public function test_password_reset_revokes_all_existing_sessions(): void
+    {
+        $this->setUpPassportClient();
+
+        $user = User::factory()->create(['password' => 'super-secret-password']);
+
+        // A live session that must be killed by the reset.
+        $token = $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'super-secret-password',
+        ])->json('access_token');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/user')
+            ->assertStatus(200);
+
+        $resetToken = Password::createToken($user);
+
+        $this->postJson('/api/reset-password', [
+            'email' => $user->email,
+            'token' => $resetToken,
+            'password' => 'Brand-New-Pass1!',
+            'password_confirmation' => 'Brand-New-Pass1!',
+        ])->assertStatus(200);
+
+        // The pre-reset token is now revoked. Flush the cached guard so the
+        // next request re-validates against the database.
+        $this->app['auth']->forgetGuards();
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/user')
+            ->assertStatus(401);
     }
 
     public function test_logout_all_revokes_every_token(): void

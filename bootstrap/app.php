@@ -5,6 +5,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -39,6 +41,26 @@ return Application::configure(basePath: dirname(__DIR__))
                         ? $e->getMessage()
                         : 'A connection error occurred. Please try again later.',
                 ], 500);
+            }
+        });
+
+        // A missing record (findOrFail / route-model-binding) surfaces as a
+        // NotFoundHttpException with an empty client message — give it real text.
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'The requested item was not found.',
+                ], 404);
+            }
+        });
+
+        // Bare abort(403) renders with an empty message; supply a friendly one
+        // while preserving any explicit message passed to abort().
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+            if ($e->getStatusCode() === 403 && ($request->is('api/*') || $request->expectsJson())) {
+                return response()->json([
+                    'message' => $e->getMessage() ?: "You don't have permission to do that.",
+                ], 403);
             }
         });
     })->create();

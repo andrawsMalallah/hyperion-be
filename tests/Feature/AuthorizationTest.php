@@ -19,10 +19,24 @@ class AuthorizationTest extends TestCase
 
         Passport::actingAs($intruder);
 
-        $this->getJson("/api/programs/{$program->id}")->assertStatus(403);
+        $this->getJson("/api/programs/{$program->id}")
+            ->assertStatus(403)
+            ->assertJson(['message' => "You don't have permission to do that."]);
         $this->putJson("/api/programs/{$program->id}", ['name' => 'Hijacked'])->assertStatus(403);
         $this->deleteJson("/api/programs/{$program->id}")->assertStatus(403);
         $this->assertDatabaseHas('programs', ['id' => $program->id, 'name' => 'Private Program']);
+    }
+
+    public function test_missing_record_returns_a_friendly_404_message(): void
+    {
+        $user = User::factory()->create();
+        $program = $user->programs()->create(['name' => 'Mine', 'is_active' => true]);
+
+        Passport::actingAs($user);
+
+        $this->getJson('/api/programs/by-day/999999')
+            ->assertStatus(404)
+            ->assertJson(['message' => 'The requested item was not found.']);
     }
 
     public function test_user_cannot_start_workout_from_another_users_day(): void
@@ -64,5 +78,22 @@ class AuthorizationTest extends TestCase
                 ['id' => $foreignDay->id, 'day_name' => 'Stolen Day', 'display_order' => 0],
             ],
         ])->assertStatus(422)->assertJsonValidationErrors(['days.0.id']);
+    }
+
+    public function test_workout_log_cannot_reference_another_users_program_day(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $program = $owner->programs()->create(['name' => 'Private Program', 'is_active' => true]);
+        $day = $program->days()->create(['day_name' => 'Push', 'display_order' => 0]);
+
+        Passport::actingAs($intruder);
+
+        $this->postJson('/api/workout-logs', [
+            'program_day_id' => $day->id,
+            'date_timestamp' => now()->toIso8601String(),
+        ])->assertStatus(422)->assertJsonValidationErrors(['program_day_id']);
+
+        $this->assertDatabaseMissing('workout_logs', ['program_day_id' => $day->id]);
     }
 }

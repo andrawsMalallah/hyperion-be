@@ -14,8 +14,6 @@ class ForgotPasswordController extends Controller
         // discover which email addresses are registered.
         Password::sendResetLink($request->only('email'));
 
-        return response()->json([
-            'message' => 'If an account exists for that email, a password reset link has been sent.',
-        ]);
+        return $this->messageResponse('If an account exists for that email, a password reset link has been sent.');
     }
 }
