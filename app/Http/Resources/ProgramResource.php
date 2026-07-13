@@ -17,6 +17,10 @@ class ProgramResource extends JsonResource
             'user' => new PublicUserResource($this->whenLoaded('user')),
             'days' => ProgramDayResource::collection($this->whenLoaded('days')),
             'created_at' => $this->created_at,
+            // Only present on the Discover listing, where the controller sets it.
+            $this->mergeWhen(isset($this->already_saved), [
+                'already_saved' => (bool) $this->already_saved,
+            ]),
         ];
     }
 }

@@ -16,6 +16,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('exercises', ExerciseController::class)->only(['index', 'store']);
     Route::get('/programs/discover', [ProgramController::class, 'discover']);
     Route::get('/programs/by-day/{day}', [ProgramController::class, 'getByDay']);
+    Route::post('/programs/{program}/clone', [ProgramController::class, 'clone']);
     Route::apiResource('programs', ProgramController::class);
     Route::get('/user/settings', [UserSettingController::class, 'show']);
     Route::put('/user/settings', [UserSettingController::class, 'update']);

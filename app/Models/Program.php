@@ -10,6 +10,7 @@ class Program extends Model
         'name',
         'is_active',
         'is_public',
+        'source_program_id',
     ];
 
     protected $casts = [

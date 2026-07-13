@@ -250,4 +250,113 @@ class ProgramTest extends TestCase
         $this->assertEquals(0, $Program1->fresh()->is_active);
         $this->assertEquals(1, $Program2->fresh()->is_active);
     }
+
+    public function test_user_can_clone_a_public_program()
+    {
+        $owner = User::factory()->create();
+        $cloner = User::factory()->create();
+
+        $exercise = Exercise::create([
+            'name' => 'Bench Press',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound',
+        ]);
+
+        $program = $owner->programs()->create(['name' => 'Public PPL', 'is_active' => true, 'is_public' => true]);
+        $day = $program->days()->create(['day_name' => 'Push', 'display_order' => 1]);
+        $day->exercises()->attach($exercise->id, [
+            'display_order' => 0,
+            'target_sets' => 3,
+            'rep_range_min' => 8,
+            'rep_range_max' => 12,
+            'target_rpe' => 8,
+            'rest_seconds' => 120,
+        ]);
+
+        Passport::actingAs($cloner);
+        $response = $this->postJson("/api/programs/{$program->id}/clone");
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.name', 'Public PPL')
+            ->assertJsonPath('data.is_public', false)
+            ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.days.0.day_name', 'Push')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.target_sets', 3)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rest_seconds', 120);
+
+        // A new, separate program row owned by the cloner, linked to its source.
+        $newId = $response->json('data.id');
+        $this->assertNotEquals($program->id, $newId);
+        $this->assertEquals(1, $cloner->programs()->count());
+        $this->assertDatabaseHas('programs', [
+            'id' => $newId,
+            'user_id' => $cloner->id,
+            'is_public' => false,
+            'source_program_id' => $program->id,
+        ]);
+    }
+
+    public function test_discover_flags_programs_the_user_has_already_saved()
+    {
+        $owner = User::factory()->create();
+        $cloner = User::factory()->create();
+
+        $saved = $owner->programs()->create(['name' => 'Saved One', 'is_active' => false, 'is_public' => true]);
+        $notSaved = $owner->programs()->create(['name' => 'Not Saved', 'is_active' => false, 'is_public' => true]);
+
+        Passport::actingAs($cloner);
+        $this->postJson("/api/programs/{$saved->id}/clone")->assertStatus(201);
+
+        $data = collect($this->getJson('/api/programs/discover')->assertStatus(200)->json('data'))->keyBy('id');
+
+        $this->assertTrue($data[$saved->id]['already_saved']);
+        $this->assertFalse($data[$notSaved->id]['already_saved']);
+    }
+
+    public function test_cloning_does_not_modify_the_source_program()
+    {
+        $owner = User::factory()->create();
+        $cloner = User::factory()->create();
+
+        $program = $owner->programs()->create(['name' => 'Original', 'is_active' => true, 'is_public' => true]);
+        $program->days()->create(['day_name' => 'Day 1', 'display_order' => 1]);
+
+        Passport::actingAs($cloner);
+        $this->postJson("/api/programs/{$program->id}/clone")->assertStatus(201);
+
+        // Source untouched: still owned by owner, still public/active, one day.
+        $this->assertDatabaseHas('programs', [
+            'id' => $program->id,
+            'user_id' => $owner->id,
+            'is_public' => true,
+            'is_active' => true,
+        ]);
+        $this->assertEquals(1, $program->days()->count());
+    }
+
+    public function test_cannot_clone_your_own_program()
+    {
+        // Even a public program you own can't be self-cloned — cloning is for
+        // saving other people's programs.
+        $user = User::factory()->create();
+        $program = $user->programs()->create(['name' => 'Mine', 'is_active' => false, 'is_public' => true]);
+
+        Passport::actingAs($user);
+        $this->postJson("/api/programs/{$program->id}/clone")->assertStatus(403);
+
+        // No duplicate created — still just the original.
+        $this->assertEquals(1, $user->programs()->count());
+    }
+
+    public function test_cannot_clone_a_private_program_you_do_not_own()
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $program = $owner->programs()->create(['name' => 'Secret', 'is_active' => false, 'is_public' => false]);
+
+        Passport::actingAs($intruder);
+        $this->postJson("/api/programs/{$program->id}/clone")->assertStatus(403);
+
+        $this->assertEquals(0, $intruder->programs()->count());
+    }
 }

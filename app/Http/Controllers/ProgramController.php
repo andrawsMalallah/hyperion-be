@@ -51,6 +51,17 @@ class ProgramController extends Controller
 
         $programs = $query->latest()->paginate(30);
 
+        // Flag which of these the current user has already saved (cloned) so the
+        // Discover UI shows a "Saved" state instead of the save button.
+        $savedSourceIds = $request->user()->programs()
+            ->whereNotNull('source_program_id')
+            ->pluck('source_program_id')
+            ->flip();
+
+        $programs->getCollection()->each(function ($program) use ($savedSourceIds) {
+            $program->already_saved = $savedSourceIds->has($program->id);
+        });
+
         return ProgramResource::collection($programs);
     }
 
@@ -105,6 +116,66 @@ class ProgramController extends Controller
         });
 
         return new ProgramResource($program->load($this->ownDaysWith()));
+    }
+
+    /**
+     * Deep-copy a public program (or one the user already owns) into the
+     * requester's account as a private, inactive draft — the "Save to my
+     * programs" action from Discover. Days and their full prescription pivots
+     * are copied; the source program is never modified.
+     */
+    public function clone(Request $request, Program $program)
+    {
+        // Cloning is for saving *other people's* public programs. You already
+        // have your own — the button is hidden client-side, and this guards a
+        // direct API call.
+        if ($request->user()->id === $program->user_id) {
+            abort(403, 'You already have this program.');
+        }
+
+        // Someone else's private program: don't even confirm it exists.
+        if (! $program->is_public) {
+            abort(403);
+        }
+
+        $copy = \DB::transaction(function () use ($request, $program) {
+            $copy = $request->user()->programs()->create([
+                'name' => $program->name,
+                'is_public' => false,
+                'is_active' => false,
+                'source_program_id' => $program->id,
+            ]);
+
+            $program->load('days.exercises');
+
+            foreach ($program->days as $day) {
+                $newDay = $copy->days()->create([
+                    'day_name' => $day->day_name,
+                    'display_order' => $day->display_order,
+                ]);
+
+                $exercises = [];
+                foreach ($day->exercises as $exercise) {
+                    $exercises[$exercise->id] = [
+                        'display_order' => $exercise->pivot->display_order,
+                        'target_sets' => $exercise->pivot->target_sets,
+                        'rep_range_min' => $exercise->pivot->rep_range_min,
+                        'rep_range_max' => $exercise->pivot->rep_range_max,
+                        'target_rpe' => $exercise->pivot->target_rpe,
+                        'rest_seconds' => $exercise->pivot->rest_seconds,
+                        'notes' => $exercise->pivot->notes,
+                    ];
+                }
+
+                if (! empty($exercises)) {
+                    $newDay->exercises()->sync($exercises);
+                }
+            }
+
+            return $copy;
+        });
+
+        return new ProgramResource($copy->load($this->ownDaysWith()));
     }
 
     public function show(Request $request, Program $program)
