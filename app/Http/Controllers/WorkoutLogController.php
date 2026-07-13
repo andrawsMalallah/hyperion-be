@@ -30,10 +30,13 @@ class WorkoutLogController extends Controller
      */
     public function recentSets(Request $request)
     {
+        // Cap the id count so a caller can't force a huge whereIn plus one
+        // per-exercise SetLog query below (each id adds a query in the loop).
         $ids = collect(explode(',', (string) $request->query('ids', '')))
             ->map(fn ($v) => (int) trim($v))
             ->filter()
             ->unique()
+            ->take(50)
             ->values();
 
         if ($ids->isEmpty()) {
