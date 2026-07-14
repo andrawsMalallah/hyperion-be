@@ -146,6 +146,35 @@ class WorkoutLogTest extends TestCase
         $this->assertEqualsWithDelta(116.67, $response->json("data.{$ex->id}.best_e1rm"), 0.5);
     }
 
+    public function test_recent_sets_returns_each_exercises_own_latest_session()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $a = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+        $b = Exercise::create(['name' => 'Row', 'target_muscle_group' => 'Back', 'mechanics_type' => 'Compound']);
+
+        // A's most recent session also contains B — but B was trained again more
+        // recently, so B's "last" must come from that later session, not this
+        // shared one. Guards the per-exercise latest-log filtering.
+        $shared = $user->workoutLogs()->create(['date_timestamp' => now()->subDays(3)]);
+        $shared->sets()->create(['exercise_id' => $a->id, 'weight' => 90, 'reps' => 8, 'set_order' => 1]);
+        $shared->sets()->create(['exercise_id' => $b->id, 'weight' => 40, 'reps' => 12, 'set_order' => 2]);
+
+        $laterB = $user->workoutLogs()->create(['date_timestamp' => now()->subDay()]);
+        $laterB->sets()->create(['exercise_id' => $b->id, 'weight' => 45, 'reps' => 10, 'set_order' => 1]);
+
+        $response = $this->getJson('/api/exercises/recent-sets?ids='.$a->id.','.$b->id);
+
+        $response->assertStatus(200);
+        // A: its latest (and only) session.
+        $this->assertCount(1, $response->json("data.{$a->id}.last"));
+        $this->assertEquals(90, $response->json("data.{$a->id}.last.0.weight"));
+        // B: the later session, NOT the 40x12 from the shared log.
+        $this->assertCount(1, $response->json("data.{$b->id}.last"));
+        $this->assertEquals(45, $response->json("data.{$b->id}.last.0.weight"));
+        $this->assertEquals(10, $response->json("data.{$b->id}.last.0.reps"));
+    }
+
     public function test_owner_can_edit_a_logged_workout_replacing_sets_and_notes()
     {
         $user = User::factory()->create();

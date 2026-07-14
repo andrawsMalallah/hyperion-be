@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\UserSettingController;
 use App\Http\Controllers\WorkoutLogController;
 use Illuminate\Support\Facades\Route;
@@ -20,5 +21,6 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('programs', ProgramController::class);
     Route::get('/user/settings', [UserSettingController::class, 'show']);
     Route::put('/user/settings', [UserSettingController::class, 'update']);
+    Route::get('/progress/stats', ProgressController::class);
     Route::apiResource('workout-logs', WorkoutLogController::class);
 });

@@ -8,6 +8,7 @@ use App\Http\Resources\ProgramResource;
 use App\Models\Program;
 use App\Models\ProgramDay;
 use App\Models\WorkoutLog;
+use App\Services\ProgramDaySync;
 use Illuminate\Http\Request;
 
 class ProgramController extends Controller
@@ -76,11 +77,11 @@ class ProgramController extends Controller
         return ProgramResource::collection($programs);
     }
 
-    public function store(StoreProgramRequest $request)
+    public function store(StoreProgramRequest $request, ProgramDaySync $daySync)
     {
         $validated = $request->validated();
 
-        $program = \DB::transaction(function () use ($request, $validated) {
+        $program = \DB::transaction(function () use ($request, $validated, $daySync) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
                 $request->user()->programs()->update(['is_active' => false]);
             }
@@ -88,28 +89,7 @@ class ProgramController extends Controller
             $program = $request->user()->programs()->create($validated);
 
             if ($request->has('days')) {
-                foreach ($request->days as $dayData) {
-                    $day = $program->days()->create([
-                        'day_name' => $dayData['day_name'],
-                        'display_order' => $dayData['display_order'] ?? 0,
-                    ]);
-
-                    if (isset($dayData['exercises'])) {
-                        $exercises = [];
-                        foreach ($dayData['exercises'] as $index => $exerciseData) {
-                            $exercises[$exerciseData['exercise_id']] = [
-                                'display_order' => $index,
-                                'target_sets' => $exerciseData['target_sets'] ?? null,
-                                'rep_range_min' => $exerciseData['rep_range_min'] ?? null,
-                                'rep_range_max' => $exerciseData['rep_range_max'] ?? null,
-                                'target_rpe' => $exerciseData['target_rpe'] ?? null,
-                                'rest_seconds' => $exerciseData['rest_seconds'] ?? null,
-                                'notes' => $exerciseData['notes'] ?? null,
-                            ];
-                        }
-                        $day->exercises()->sync($exercises);
-                    }
-                }
+                $daySync->sync($program, $request->days);
             }
 
             return $program;
@@ -185,13 +165,13 @@ class ProgramController extends Controller
         return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
-    public function update(UpdateProgramRequest $request, Program $program)
+    public function update(UpdateProgramRequest $request, Program $program, ProgramDaySync $daySync)
     {
         $this->authorize('update', $program);
 
         $validated = $request->validated();
 
-        \DB::transaction(function () use ($request, $program, $validated) {
+        \DB::transaction(function () use ($request, $program, $validated, $daySync) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
                 $request->user()->programs()->where('id', '!=', $program->id)->update(['is_active' => false]);
             }
@@ -199,44 +179,7 @@ class ProgramController extends Controller
             $program->update($validated);
 
             if ($request->has('days')) {
-                // Get existing day IDs that are being kept
-                $keptDayIds = collect($request->days)->pluck('id')->filter()->toArray();
-
-                // Delete days that are no longer in the payload
-                $program->days()->whereNotIn('id', $keptDayIds)->delete();
-
-                foreach ($request->days as $dayData) {
-                    if (isset($dayData['id']) && $program->days()->where('id', $dayData['id'])->exists()) {
-                        $day = $program->days()->find($dayData['id']);
-                        $day->update([
-                            'day_name' => $dayData['day_name'],
-                            'display_order' => $dayData['display_order'] ?? 0,
-                        ]);
-                    } else {
-                        $day = $program->days()->create([
-                            'day_name' => $dayData['day_name'],
-                            'display_order' => $dayData['display_order'] ?? 0,
-                        ]);
-                    }
-
-                    if (isset($dayData['exercises'])) {
-                        $exercises = [];
-                        foreach ($dayData['exercises'] as $index => $exerciseData) {
-                            $exercises[$exerciseData['exercise_id']] = [
-                                'display_order' => $index,
-                                'target_sets' => $exerciseData['target_sets'] ?? null,
-                                'rep_range_min' => $exerciseData['rep_range_min'] ?? null,
-                                'rep_range_max' => $exerciseData['rep_range_max'] ?? null,
-                                'target_rpe' => $exerciseData['target_rpe'] ?? null,
-                                'rest_seconds' => $exerciseData['rest_seconds'] ?? null,
-                                'notes' => $exerciseData['notes'] ?? null,
-                            ];
-                        }
-                        $day->exercises()->sync($exercises);
-                    } else {
-                        $day->exercises()->sync([]);
-                    }
-                }
+                $daySync->sync($program, $request->days);
             }
         });
 
