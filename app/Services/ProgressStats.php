@@ -30,17 +30,36 @@ class ProgressStats
         $userId = $user->id;
 
         $bestSets = $this->bestSetPerSession($userId);
-        [$e1rmByExercise, $recentPrs] = $this->buildSeriesAndPrs($bestSets, $this->exerciseNames($userId));
+        [$seriesByExercise, $recentPrs] = $this->buildSeriesAndPrs($bestSets, $this->exerciseNames($userId));
+        $exercises = $this->exerciseOptions($userId);
+
+        // Ship only the first (most-logged) exercise's series so the page renders
+        // immediately; the rest load on demand via e1rmSeriesFor() when the user
+        // selects them.
+        $firstId = $exercises[0]['id'] ?? null;
+        $initial = $firstId !== null ? [$firstId => $seriesByExercise[$firstId] ?? []] : [];
 
         return [
             'week' => $this->weekTiles($userId),
-            'exercises' => $this->exerciseOptions($userId),
+            'exercises' => $exercises,
             'weekly_volume' => $this->weeklyVolume($userId),
             'recent_prs' => $recentPrs,
             // Cast to object so it always JSON-encodes as a map keyed by exercise
             // id, never as a positional array.
-            'e1rm_by_exercise' => (object) $e1rmByExercise,
+            'e1rm_by_exercise' => (object) $initial,
         ];
+    }
+
+    /**
+     * e1RM-per-session series for a single exercise (oldest first) — the
+     * lazy-loaded payload when the user picks an exercise the page didn't ship
+     * upfront. Scoped to the user's own logs via the query's user_id filter.
+     */
+    public function e1rmSeriesFor(User $user, int $exerciseId): array
+    {
+        return $this->bestSetPerSession($user->id, $exerciseId)
+            ->map(fn ($row) => $this->pointFromRow($row))
+            ->all();
     }
 
     /**
@@ -48,7 +67,7 @@ class ProgressStats
      * 1RM that session, ordered oldest-first within each exercise. Uses a window
      * function (Postgres + SQLite ≥3.25) instead of pulling every set.
      */
-    private function bestSetPerSession(int $userId): Collection
+    private function bestSetPerSession(int $userId, ?int $exerciseId = null): Collection
     {
         $ranked = DB::table('set_logs as sl')
             ->join('workout_logs as wl', 'sl.workout_log_id', '=', 'wl.id')
@@ -56,6 +75,7 @@ class ProgressStats
             ->where('sl.set_type', '!=', 'warmup')
             ->where('sl.weight', '>', 0)
             ->where('sl.reps', '>', 0)
+            ->when($exerciseId !== null, fn ($q) => $q->where('sl.exercise_id', $exerciseId))
             ->select('sl.exercise_id', 'wl.date_timestamp', 'sl.weight', 'sl.reps')
             ->selectRaw(self::E1RM_EXPR.' as e1rm')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY sl.exercise_id, sl.workout_log_id ORDER BY '.self::E1RM_EXPR.' DESC, sl.weight DESC) as rn');
@@ -82,13 +102,7 @@ class ProgressStats
         foreach ($bestSets as $row) {
             $exId = (int) $row->exercise_id;
             $e1rm = (float) $row->e1rm;
-            $point = [
-                'date' => $row->date_timestamp,
-                'e1rm' => $e1rm,
-                'weight' => (float) $row->weight,
-                'reps' => (int) $row->reps,
-            ];
-            $seriesByExercise[$exId][] = $point;
+            $seriesByExercise[$exId][] = $this->pointFromRow($row);
 
             // A new all-time best (with prior history) is a PR.
             $prev = $runningBest[$exId] ?? 0;
@@ -112,6 +126,17 @@ class ProgressStats
         $prs = array_slice($prs, 0, self::RECENT_PRS);
 
         return [$seriesByExercise, $prs];
+    }
+
+    /** A single e1RM series point from a best-set query row. */
+    private function pointFromRow(object $row): array
+    {
+        return [
+            'date' => $row->date_timestamp,
+            'e1rm' => (float) $row->e1rm,
+            'weight' => (float) $row->weight,
+            'reps' => (int) $row->reps,
+        ];
     }
 
     /** exercise_id => name, for every exercise the user has logged. */

@@ -21,6 +21,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('programs', ProgramController::class);
     Route::get('/user/settings', [UserSettingController::class, 'show']);
     Route::put('/user/settings', [UserSettingController::class, 'update']);
-    Route::get('/progress/stats', ProgressController::class);
+    Route::get('/progress/stats', [ProgressController::class, 'stats']);
+    Route::get('/progress/exercises/{exercise}/e1rm', [ProgressController::class, 'exerciseSeries']);
     Route::apiResource('workout-logs', WorkoutLogController::class);
 });

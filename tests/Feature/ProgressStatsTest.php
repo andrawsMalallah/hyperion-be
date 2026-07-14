@@ -101,4 +101,69 @@ class ProgressStatsTest extends TestCase
         $this->assertCount(1, $weekly);
         $this->assertSame(1000, (int) $weekly[0]['volume']);
     }
+
+    public function test_progress_stats_ships_only_the_first_exercises_series()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $a = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+        $b = Exercise::create(['name' => 'Row', 'target_muscle_group' => 'Back', 'mechanics_type' => 'Compound']);
+
+        // A is logged more (2 sets) → it's the most-logged, so it's "first".
+        $log = $user->workoutLogs()->create(['date_timestamp' => now()]);
+        $log->sets()->create(['exercise_id' => $a->id, 'weight' => 100, 'reps' => 5, 'set_order' => 1]);
+        $log->sets()->create(['exercise_id' => $a->id, 'weight' => 100, 'reps' => 5, 'set_order' => 2]);
+        $log->sets()->create(['exercise_id' => $b->id, 'weight' => 50, 'reps' => 8, 'set_order' => 3]);
+
+        $response = $this->getJson('/api/progress/stats');
+
+        $response->assertOk();
+        // Dropdown lists both exercises...
+        $this->assertCount(2, $response->json('data.exercises'));
+        // ...but only the first (A) has its series shipped; B loads on demand.
+        $this->assertArrayHasKey((string) $a->id, $response->json('data.e1rm_by_exercise'));
+        $this->assertArrayNotHasKey((string) $b->id, $response->json('data.e1rm_by_exercise'));
+    }
+
+    public function test_exercise_series_endpoint_returns_one_exercises_series()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+
+        $first = $user->workoutLogs()->create(['date_timestamp' => now()->subDays(3)]);
+        $first->sets()->create(['exercise_id' => $ex->id, 'weight' => 100, 'reps' => 5, 'set_order' => 1]);
+        $first->sets()->create(['exercise_id' => $ex->id, 'weight' => 200, 'reps' => 1, 'set_type' => 'warmup', 'set_order' => 0]);
+        $second = $user->workoutLogs()->create(['date_timestamp' => now()]);
+        $second->sets()->create(['exercise_id' => $ex->id, 'weight' => 110, 'reps' => 5, 'set_order' => 1]);
+
+        $response = $this->getJson("/api/progress/exercises/{$ex->id}/e1rm");
+
+        $response->assertOk();
+        $series = $response->json('data');
+        $this->assertCount(2, $series); // oldest first, warmup excluded
+        $this->assertEqualsWithDelta(116.67, $series[0]['e1rm'], 0.5);
+        $this->assertEqualsWithDelta(128.33, $series[1]['e1rm'], 0.5);
+    }
+
+    public function test_exercise_series_requires_auth()
+    {
+        $ex = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+        $this->getJson("/api/progress/exercises/{$ex->id}/e1rm")->assertUnauthorized();
+    }
+
+    public function test_exercise_series_is_scoped_to_the_user()
+    {
+        $me = User::factory()->create();
+        $other = User::factory()->create();
+        $ex = Exercise::create(['name' => 'Squat', 'target_muscle_group' => 'Legs', 'mechanics_type' => 'Compound']);
+
+        $log = $other->workoutLogs()->create(['date_timestamp' => now()]);
+        $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 150, 'reps' => 3, 'set_order' => 1]);
+
+        Passport::actingAs($me);
+        $this->getJson("/api/progress/exercises/{$ex->id}/e1rm")
+            ->assertOk()
+            ->assertJsonPath('data', []);
+    }
 }
