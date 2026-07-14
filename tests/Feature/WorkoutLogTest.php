@@ -146,6 +146,85 @@ class WorkoutLogTest extends TestCase
         $this->assertEqualsWithDelta(116.67, $response->json("data.{$ex->id}.best_e1rm"), 0.5);
     }
 
+    public function test_owner_can_edit_a_logged_workout_replacing_sets_and_notes()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Squat', 'target_muscle_group' => 'Legs', 'mechanics_type' => 'Compound']);
+
+        $log = $user->workoutLogs()->create(['date_timestamp' => now(), 'notes' => 'original']);
+        $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 100, 'reps' => 5, 'set_order' => 1]);
+        $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 100, 'reps' => 5, 'set_order' => 2]);
+
+        $response = $this->putJson("/api/workout-logs/{$log->id}", [
+            'notes' => 'fixed a typo',
+            'sets' => [
+                ['exercise_id' => $ex->id, 'weight' => 110, 'reps' => 5, 'set_order' => 1],
+            ],
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.notes', 'fixed a typo')
+            ->assertJsonCount(1, 'data.sets')
+            ->assertJsonPath('data.sets.0.weight', 110);
+
+        // Old set rows are replaced, not appended.
+        $this->assertDatabaseCount('set_logs', 1);
+        $this->assertDatabaseHas('set_logs', ['workout_log_id' => $log->id, 'weight' => 110]);
+    }
+
+    public function test_notes_only_edit_keeps_the_existing_sets()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Bench', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+
+        $log = $user->workoutLogs()->create(['date_timestamp' => now()]);
+        $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 80, 'reps' => 8, 'set_order' => 1]);
+
+        $response = $this->putJson("/api/workout-logs/{$log->id}", [
+            'notes' => 'great session',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.notes', 'great session')
+            ->assertJsonCount(1, 'data.sets');
+        $this->assertDatabaseHas('set_logs', ['workout_log_id' => $log->id, 'weight' => 80]);
+    }
+
+    public function test_user_cannot_edit_someone_elses_workout()
+    {
+        $owner = User::factory()->create();
+        $log = $owner->workoutLogs()->create(['date_timestamp' => now(), 'notes' => 'private']);
+
+        $intruder = User::factory()->create();
+        Passport::actingAs($intruder);
+
+        $this->putJson("/api/workout-logs/{$log->id}", ['notes' => 'hacked'])
+            ->assertStatus(403);
+        $this->assertDatabaseHas('workout_logs', ['id' => $log->id, 'notes' => 'private']);
+    }
+
+    public function test_editing_a_workout_rejects_out_of_range_set_values()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $ex = Exercise::create(['name' => 'Row', 'target_muscle_group' => 'Back', 'mechanics_type' => 'Compound']);
+        $log = $user->workoutLogs()->create(['date_timestamp' => now()]);
+        $log->sets()->create(['exercise_id' => $ex->id, 'weight' => 60, 'reps' => 10, 'set_order' => 1]);
+
+        $this->putJson("/api/workout-logs/{$log->id}", [
+            'sets' => [
+                ['exercise_id' => $ex->id, 'weight' => 5000, 'reps' => 500, 'rpe' => 15, 'set_order' => -1],
+            ],
+        ])->assertStatus(422)->assertJsonValidationErrors([
+            'sets.0.weight',
+            'sets.0.reps',
+            'sets.0.rpe',
+            'sets.0.set_order',
+        ]);
+    }
+
     public function test_exercise_logs_are_paginated_and_scoped_to_the_exercise()
     {
         $user = User::factory()->create();

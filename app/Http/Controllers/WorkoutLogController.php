@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreWorkoutLogRequest;
+use App\Http\Requests\UpdateWorkoutLogRequest;
 use App\Http\Resources\WorkoutLogResource;
 use App\Models\Exercise;
 use App\Models\SetLog;
@@ -146,6 +147,35 @@ class WorkoutLogController extends Controller
         if ($request->user()->id !== $workoutLog->user_id) {
             abort(403);
         }
+
+        return new WorkoutLogResource($workoutLog->load(['day.program', 'sets.exercise']));
+    }
+
+    public function update(UpdateWorkoutLogRequest $request, WorkoutLog $workoutLog)
+    {
+        if ($request->user()->id !== $workoutLog->user_id) {
+            abort(403);
+        }
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($request, $workoutLog, $data) {
+            // Only touch notes if the caller sent them (a notes-only patch from
+            // the post-save summary modal must not wipe the sets, and a sets
+            // edit must not clear existing notes).
+            if (array_key_exists('notes', $data)) {
+                $workoutLog->notes = $data['notes'];
+                $workoutLog->save();
+            }
+
+            // Full replace: the edit modal always sends the complete set list.
+            if ($request->has('sets')) {
+                $workoutLog->sets()->delete();
+                foreach ($request->sets as $setData) {
+                    $workoutLog->sets()->create($setData);
+                }
+            }
+        });
 
         return new WorkoutLogResource($workoutLog->load(['day.program', 'sets.exercise']));
     }

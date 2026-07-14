@@ -20,5 +20,5 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('programs', ProgramController::class);
     Route::get('/user/settings', [UserSettingController::class, 'show']);
     Route::put('/user/settings', [UserSettingController::class, 'update']);
-    Route::apiResource('workout-logs', WorkoutLogController::class)->except(['update']);
+    Route::apiResource('workout-logs', WorkoutLogController::class);
 });
