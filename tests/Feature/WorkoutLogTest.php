@@ -200,8 +200,9 @@ class WorkoutLogTest extends TestCase
         $intruder = User::factory()->create();
         Passport::actingAs($intruder);
 
+        // A workout you don't own is hidden as 404 (not 403) by WorkoutLogPolicy.
         $this->putJson("/api/workout-logs/{$log->id}", ['notes' => 'hacked'])
-            ->assertStatus(403);
+            ->assertStatus(404);
         $this->assertDatabaseHas('workout_logs', ['id' => $log->id, 'notes' => 'private']);
     }
 

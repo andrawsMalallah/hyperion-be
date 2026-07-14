@@ -180,18 +180,14 @@ class ProgramController extends Controller
 
     public function show(Request $request, Program $program)
     {
-        if ($request->user()->id !== $program->user_id) {
-            abort(403);
-        }
+        $this->authorize('view', $program);
 
         return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function update(UpdateProgramRequest $request, Program $program)
     {
-        if ($request->user()->id !== $program->user_id) {
-            abort(403);
-        }
+        $this->authorize('update', $program);
 
         $validated = $request->validated();
 
@@ -251,18 +247,14 @@ class ProgramController extends Controller
     {
         $day = ProgramDay::findOrFail($dayId);
         $program = $day->program;
-        if ($request->user()->id !== $program->user_id) {
-            abort(403);
-        }
+        $this->authorize('view', $program);
 
         return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
     public function destroy(Request $request, Program $program)
     {
-        if ($request->user()->id !== $program->user_id) {
-            abort(403);
-        }
+        $this->authorize('delete', $program);
 
         \DB::transaction(function () use ($program) {
             $dayIds = $program->days()->pluck('id')->toArray();

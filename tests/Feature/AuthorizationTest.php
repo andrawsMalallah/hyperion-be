@@ -19,11 +19,13 @@ class AuthorizationTest extends TestCase
 
         Passport::actingAs($intruder);
 
+        // A program you don't own is hidden as a 404 (not 403) so its existence
+        // isn't confirmed — enforced by ProgramPolicy::denyAsNotFound.
         $this->getJson("/api/programs/{$program->id}")
-            ->assertStatus(403)
-            ->assertJson(['message' => "You don't have permission to do that."]);
-        $this->putJson("/api/programs/{$program->id}", ['name' => 'Hijacked'])->assertStatus(403);
-        $this->deleteJson("/api/programs/{$program->id}")->assertStatus(403);
+            ->assertStatus(404)
+            ->assertJson(['message' => 'The requested item was not found.']);
+        $this->putJson("/api/programs/{$program->id}", ['name' => 'Hijacked'])->assertStatus(404);
+        $this->deleteJson("/api/programs/{$program->id}")->assertStatus(404);
         $this->assertDatabaseHas('programs', ['id' => $program->id, 'name' => 'Private Program']);
     }
 
@@ -48,7 +50,7 @@ class AuthorizationTest extends TestCase
 
         Passport::actingAs($intruder);
 
-        $this->getJson("/api/programs/by-day/{$day->id}")->assertStatus(403);
+        $this->getJson("/api/programs/by-day/{$day->id}")->assertStatus(404);
     }
 
     public function test_user_cannot_access_another_users_workout_log(): void
@@ -59,8 +61,8 @@ class AuthorizationTest extends TestCase
 
         Passport::actingAs($intruder);
 
-        $this->getJson("/api/workout-logs/{$log->id}")->assertStatus(403);
-        $this->deleteJson("/api/workout-logs/{$log->id}")->assertStatus(403);
+        $this->getJson("/api/workout-logs/{$log->id}")->assertStatus(404);
+        $this->deleteJson("/api/workout-logs/{$log->id}")->assertStatus(404);
         $this->assertDatabaseHas('workout_logs', ['id' => $log->id]);
     }
 

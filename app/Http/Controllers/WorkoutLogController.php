@@ -144,18 +144,14 @@ class WorkoutLogController extends Controller
 
     public function show(Request $request, WorkoutLog $workoutLog)
     {
-        if ($request->user()->id !== $workoutLog->user_id) {
-            abort(403);
-        }
+        $this->authorize('view', $workoutLog);
 
         return new WorkoutLogResource($workoutLog->load(['day.program', 'sets.exercise']));
     }
 
     public function update(UpdateWorkoutLogRequest $request, WorkoutLog $workoutLog)
     {
-        if ($request->user()->id !== $workoutLog->user_id) {
-            abort(403);
-        }
+        $this->authorize('update', $workoutLog);
 
         $data = $request->validated();
 
@@ -182,9 +178,7 @@ class WorkoutLogController extends Controller
 
     public function destroy(Request $request, WorkoutLog $workoutLog)
     {
-        if ($request->user()->id !== $workoutLog->user_id) {
-            abort(403);
-        }
+        $this->authorize('delete', $workoutLog);
         $workoutLog->delete();
 
         return response()->noContent();
