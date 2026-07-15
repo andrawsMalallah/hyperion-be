@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureEmailVerified;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->throttleApi();
+
+        // Override the framework's `verified` alias so an unverified account
+        // gets a 409 { code: email_unverified } JSON response the SPA can act on,
+        // instead of the default 403 (which the app reserves for authorization).
+        $middleware->alias([
+            'verified' => EnsureEmailVerified::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

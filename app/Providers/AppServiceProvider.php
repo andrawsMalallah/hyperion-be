@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use App\Mail\BrevoApiTransport;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Passport\Passport;
@@ -68,6 +70,30 @@ class AppServiceProvider extends ServiceProvider
             return config('app.frontend_url')
                 .'/reset-password/'.$token
                 .'?email='.urlencode($notifiable->getEmailForPasswordReset());
+        });
+
+        // Same idea for email verification: the default link targets the API's
+        // signed `verification.verify` route (JSON-only). We sign that backend
+        // URL, then hand the SPA the same {id}/{hash} + signature query so its
+        // verify page can forward them to the API — the signature stays valid
+        // because it was computed against the backend route the SPA calls.
+        VerifyEmail::createUrlUsing(function ($notifiable) {
+            $signedUrl = URL::temporarySignedRoute(
+                'verification.verify',
+                now()->addMinutes(config('auth.verification.expire', 60)),
+                [
+                    'id' => $notifiable->getKey(),
+                    'hash' => sha1($notifiable->getEmailForVerification()),
+                ]
+            );
+
+            // Reuse the signed query (expires + signature) unchanged.
+            $query = parse_url($signedUrl, PHP_URL_QUERY);
+
+            return config('app.frontend_url')
+                .'/verify-email/'.$notifiable->getKey()
+                .'/'.sha1($notifiable->getEmailForVerification())
+                .'?'.$query;
         });
     }
 }
