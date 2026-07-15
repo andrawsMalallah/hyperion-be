@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Exercise;
 use App\Models\User;
+use App\Models\UserSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
@@ -183,6 +185,78 @@ class ProfileTest extends TestCase
             ->getJson('/api/user/sessions')
             ->assertStatus(200)
             ->assertJsonCount(1, 'data');
+    }
+
+    public function test_account_deletion_removes_the_user_and_all_their_data(): void
+    {
+        $this->setUpPassportClient();
+
+        $user = User::factory()->create(['password' => 'super-secret-password']);
+        $otherUser = User::factory()->create();
+
+        // Data owned by the user that must cascade away on delete.
+        $program = $user->programs()->create(['name' => 'My Program']);
+        $log = $user->workoutLogs()->create(['date_timestamp' => now()]);
+        $exercise = Exercise::create(['name' => 'Squat', 'target_muscle_group' => 'Legs', 'mechanics_type' => 'Compound']);
+        $log->sets()->create(['exercise_id' => $exercise->id, 'weight' => 100, 'reps' => 5, 'set_order' => 1]);
+        UserSetting::create(['user_id' => $user->id, 'weight_unit' => 'kg']);
+
+        // The user's own PENDING contribution is private → must be deleted.
+        $ownPending = Exercise::create([
+            'name' => 'Secret Curl', 'target_muscle_group' => 'Biceps',
+            'mechanics_type' => 'Isolation', 'created_by' => $user->id, 'status' => 'pending',
+        ]);
+        // The user's APPROVED contribution is shared catalog → must survive,
+        // only de-identified (created_by nulled).
+        $ownApproved = Exercise::create([
+            'name' => 'Community Press', 'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound', 'created_by' => $user->id, 'status' => 'approved',
+        ]);
+
+        // A real login so there's an oauth_access_tokens row to clean up.
+        $token = $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'super-secret-password',
+        ])->json('access_token');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->deleteJson('/api/user', ['current_password' => 'super-secret-password'])
+            ->assertStatus(200);
+
+        // The account and every cascaded record is gone.
+        $this->assertDatabaseMissing('users', ['id' => $user->id]);
+        $this->assertDatabaseMissing('programs', ['id' => $program->id]);
+        $this->assertDatabaseMissing('workout_logs', ['id' => $log->id]);
+        $this->assertDatabaseMissing('set_logs', ['workout_log_id' => $log->id]);
+        $this->assertDatabaseMissing('user_settings', ['user_id' => $user->id]);
+        $this->assertDatabaseMissing('oauth_access_tokens', ['user_id' => $user->id]);
+
+        // The user's own pending exercise is gone…
+        $this->assertDatabaseMissing('exercises', ['id' => $ownPending->id]);
+        // …but the approved (shared) one survives, de-identified.
+        $this->assertDatabaseHas('exercises', ['id' => $ownApproved->id, 'created_by' => null]);
+
+        // Other members are untouched.
+        $this->assertDatabaseHas('users', ['id' => $otherUser->id]);
+    }
+
+    public function test_account_deletion_rejects_a_wrong_password(): void
+    {
+        $user = User::factory()->create(['password' => 'super-secret-password']);
+        Passport::actingAs($user);
+
+        $this->deleteJson('/api/user', ['current_password' => 'not-the-password'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['current_password']);
+
+        // Nothing was deleted.
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
+    }
+
+    public function test_account_deletion_requires_authentication(): void
+    {
+        $this->deleteJson('/api/user', ['current_password' => 'whatever'])
+            ->assertStatus(401);
     }
 
     public function test_password_change_revokes_other_tokens_but_keeps_current(): void

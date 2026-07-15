@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteAccountRequest;
 use App\Http\Requests\UpdatePasswordRequest;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Exercise;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class ProfileController extends Controller
@@ -33,6 +36,54 @@ class ProfileController extends Controller
         $query->update(['revoked' => true]);
 
         return $this->messageResponse('Password changed successfully.');
+    }
+
+    /**
+     * Permanently delete the authenticated user's account and every trace of
+     * their data. Re-confirmed with the current password (DeleteAccountRequest).
+     *
+     * What the database FKs already cascade on user delete: programs (→ days →
+     * day_exercise), workout_logs (→ set_logs), and user_settings. What has NO
+     * cascade and must be cleaned by hand is done here inside one transaction:
+     *   - The user's own UNAPPROVED (pending) contributed exercises — private to
+     *     them, so safe to remove. Approved exercises are shared catalog rows
+     *     other users' programs reference, so those are left in place and only
+     *     de-identified (created_by → null via the exercises.created_by
+     *     nullOnDelete FK) — deleting them would cascade-break other members.
+     *   - Passport tokens (oauth_access_tokens / oauth_refresh_tokens) and the
+     *     transient oauth auth/device codes — none have a cascade FK to users.
+     *   - This email's password-reset token and any legacy web session rows.
+     */
+    public function destroy(DeleteAccountRequest $request)
+    {
+        $user = $request->user();
+
+        DB::transaction(function () use ($user) {
+            // The user's own pending contributions (approved rows stay as shared
+            // catalog, de-identified by the created_by nullOnDelete FK).
+            Exercise::where('created_by', $user->id)
+                ->where('status', '!=', 'approved')
+                ->delete();
+
+            // Passport tokens have no cascade FK to users — remove refresh
+            // tokens first (they reference the access token), then the access
+            // tokens, then the transient authorization/device-flow codes.
+            $accessTokenIds = $user->tokens()->pluck('id');
+            DB::table('oauth_refresh_tokens')->whereIn('access_token_id', $accessTokenIds)->delete();
+            $user->tokens()->delete();
+            DB::table('oauth_auth_codes')->where('user_id', $user->id)->delete();
+            DB::table('oauth_device_codes')->where('user_id', $user->id)->delete();
+
+            // Auth-adjacent leftovers keyed by email / user_id with no cascade.
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+
+            // Cascades programs (→ days → day_exercise), workout_logs (→
+            // set_logs), user_settings, and nulls created_by on kept exercises.
+            $user->delete();
+        });
+
+        return $this->messageResponse('Your account has been permanently deleted.');
     }
 
     /**

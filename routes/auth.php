@@ -37,4 +37,5 @@ Route::middleware(['auth:api', 'verified'])->group(function () {
     Route::put('/user/profile', [ProfileController::class, 'update']);
     Route::put('/user/password', [ProfileController::class, 'updatePassword']);
     Route::get('/user/sessions', [ProfileController::class, 'sessions']);
+    Route::delete('/user', [ProfileController::class, 'destroy']);
 });
