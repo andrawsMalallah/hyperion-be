@@ -19,9 +19,24 @@ class UserSettingTest extends TestCase
         $this->getJson('/api/user/settings')
             ->assertStatus(200)
             ->assertJsonPath('data.weight_unit', 'kg')
-            ->assertJsonPath('data.default_rest_time', 90);
+            ->assertJsonPath('data.default_rest_time', 90)
+            ->assertJsonPath('data.rest_notifications', false);
 
         $this->assertDatabaseHas('user_settings', ['user_id' => $user->id]);
+    }
+
+    public function test_rest_notifications_can_be_toggled(): void
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $this->putJson('/api/user/settings', ['rest_notifications' => true])
+            ->assertStatus(200)
+            ->assertJsonPath('data.rest_notifications', true);
+
+        $this->putJson('/api/user/settings', ['rest_notifications' => 'maybe'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['rest_notifications']);
     }
 
     public function test_settings_can_be_updated(): void

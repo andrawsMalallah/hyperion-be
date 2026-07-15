@@ -25,6 +25,7 @@ class UserSettingController extends Controller
     {
         return $request->user()->settings ?? $request->user()->settings()->create([
             'timer_enabled' => true,
+            'rest_notifications' => false,
             'default_rest_time' => 90,
             'weight_unit' => 'kg',
         ]);

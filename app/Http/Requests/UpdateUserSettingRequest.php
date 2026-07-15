@@ -24,6 +24,7 @@ class UpdateUserSettingRequest extends FormRequest
     {
         return [
             'timer_enabled' => 'sometimes|boolean',
+            'rest_notifications' => 'sometimes|boolean',
             'default_rest_time' => 'sometimes|integer|min:0|max:600',
             'weight_unit' => 'sometimes|string|in:kg,lbs',
         ];
@@ -45,6 +46,7 @@ class UpdateUserSettingRequest extends FormRequest
     {
         return [
             'timer_enabled' => 'rest timer',
+            'rest_notifications' => 'rest timer alerts',
             'default_rest_time' => 'default rest time',
             'weight_unit' => 'weight unit',
         ];
