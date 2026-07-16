@@ -15,6 +15,20 @@ class AdminExerciseTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Passport's auth:api guard loads the OAuth signing keys when it
+        // resolves — even under Passport::actingAs(). This class sorts before
+        // AuthTest (which generates them in CI), so provision them here too when
+        // the key files are missing, or these tests fail with "Invalid key
+        // supplied" on a fresh CI checkout.
+        if (! file_exists(storage_path('oauth-private.key'))) {
+            $this->artisan('passport:keys');
+        }
+    }
+
     private function pendingExercise(User $contributor, string $name = 'My Special Curl'): Exercise
     {
         return Exercise::create([
