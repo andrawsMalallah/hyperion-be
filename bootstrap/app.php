@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureEmailVerified;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // instead of the default 403 (which the app reserves for authorization).
         $middleware->alias([
             'verified' => EnsureEmailVerified::class,
+            'admin' => EnsureAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminExerciseController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgressController;
@@ -15,8 +16,19 @@ Route::middleware(['auth:api', 'verified'])->group(function () {
     // Per-exercise history for the Active Workout screen (defined before the
     // exercises resource so the static path isn't shadowed).
     Route::get('/exercises/recent-sets', [WorkoutLogController::class, 'recentSets']);
+    // The contributor's own submissions (all statuses) — must precede the
+    // /exercises/{exercise} binding so the static path isn't shadowed.
+    Route::get('/exercises/mine', [ExerciseController::class, 'mine']);
     Route::get('/exercises/{exercise}/logs', [WorkoutLogController::class, 'exerciseLogs']);
     Route::apiResource('exercises', ExerciseController::class)->only(['index', 'store']);
+
+    // Exercise approval dashboard — admin only.
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/exercises', [AdminExerciseController::class, 'index']);
+        Route::get('/exercises/pending', [AdminExerciseController::class, 'pending']);
+        Route::post('/exercises/{exercise}/approve', [AdminExerciseController::class, 'approve']);
+        Route::post('/exercises/{exercise}/reject', [AdminExerciseController::class, 'reject']);
+    });
     Route::get('/programs/discover', [ProgramController::class, 'discover']);
     Route::get('/programs/by-day/{day}', [ProgramController::class, 'getByDay']);
     Route::post('/programs/{program}/clone', [ProgramController::class, 'clone']);

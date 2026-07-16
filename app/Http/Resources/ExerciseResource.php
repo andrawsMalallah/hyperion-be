@@ -15,6 +15,16 @@ class ExerciseResource extends JsonResource
             'target_muscle_group' => $this->target_muscle_group,
             'mechanics_type' => $this->mechanics_type,
             'status' => $this->status,
+            // Present on the contributor's own list and the admin dashboard so a
+            // rejected submission can show why it wasn't accepted.
+            'rejection_reason' => $this->rejection_reason,
+            // Contributor id + name for the admin dashboard (only when
+            // eager-loaded; null for seeded/de-identified rows). The id powers
+            // the dashboard's "filter by this contributor" action.
+            'contributor' => $this->whenLoaded('contributor', fn () => $this->contributor ? [
+                'id' => $this->contributor->id,
+                'name' => $this->contributor->name,
+            ] : null),
             'pivot' => $this->whenPivotLoaded('day_exercise', function () {
                 return [
                     'display_order' => $this->pivot->display_order,
