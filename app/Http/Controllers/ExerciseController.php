@@ -17,11 +17,12 @@ class ExerciseController extends Controller
         $search = $request->query('search');
         $query = Exercise::query();
 
-        // Approved catalog plus the requester's own pending contributions.
-        $query->where(function ($q) use ($request) {
-            $q->where('status', 'approved')
-                ->orWhere('created_by', $request->user()->id);
-        });
+        // Approved catalog only — including your own contributions, which are
+        // selectable only once approved. Programs may therefore reference only
+        // approved exercises, which is what lets a program exported to a file
+        // resolve by name on any other account (see ProgramImportController).
+        // Contributors still track their own submissions via mine().
+        $query->where('status', 'approved');
 
         $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 

@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Exercise;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -45,11 +46,12 @@ class ProfileController extends Controller
      * What the database FKs already cascade on user delete: programs (→ days →
      * day_exercise), workout_logs (→ set_logs), and user_settings. What has NO
      * cascade and must be cleaned by hand is done here inside one transaction:
-     *   - The user's own UNAPPROVED (pending) contributed exercises — private to
-     *     them, so safe to remove. Approved exercises are shared catalog rows
-     *     other users' programs reference, so those are left in place and only
-     *     de-identified (created_by → null via the exercises.created_by
-     *     nullOnDelete FK) — deleting them would cascade-break other members.
+     *   - The user's own UNAPPROVED (pending) contributed exercises, but ONLY
+     *     those nothing references — see removeUnreferencedPendingExercises().
+     *     Approved exercises are shared catalog rows other users' programs
+     *     reference, so those are left in place and only de-identified
+     *     (created_by → null via the exercises.created_by nullOnDelete FK) —
+     *     deleting them would cascade-break other members.
      *   - Passport tokens (oauth_access_tokens / oauth_refresh_tokens) and the
      *     transient oauth auth/device codes — none have a cascade FK to users.
      *   - This email's password-reset token and any legacy web session rows.
@@ -59,11 +61,12 @@ class ProfileController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user) {
-            // The user's own pending contributions (approved rows stay as shared
-            // catalog, de-identified by the created_by nullOnDelete FK).
-            Exercise::where('created_by', $user->id)
+            // Capture these BEFORE deleting the user: that delete nulls
+            // created_by (nullOnDelete), after which their contributions can no
+            // longer be identified.
+            $ownPendingIds = Exercise::where('created_by', $user->id)
                 ->where('status', '!=', 'approved')
-                ->delete();
+                ->pluck('id');
 
             // Passport tokens have no cascade FK to users — remove refresh
             // tokens first (they reference the access token), then the access
@@ -80,10 +83,44 @@ class ProfileController extends Controller
 
             // Cascades programs (→ days → day_exercise), workout_logs (→
             // set_logs), user_settings, and nulls created_by on kept exercises.
+            // Runs BEFORE the exercise cleanup so this user's own programs and
+            // logs are already gone and no longer count as references.
             $user->delete();
+
+            $this->removeUnreferencedPendingExercises($ownPendingIds);
         });
 
         return $this->messageResponse('Your account has been permanently deleted.');
+    }
+
+    /**
+     * Delete the departing user's pending contributions, but only the ones
+     * nothing points at.
+     *
+     * A pending exercise is NOT necessarily private to its contributor: if they
+     * published a program built on it, anyone who cloned that program now
+     * references it, and `day_exercise.exercise_id` / `set_logs.exercise_id` both
+     * cascade — so deleting the row would silently strip an exercise out of
+     * someone else's program, or delete sets they actually logged. Anything still
+     * referenced is kept and merely de-identified (the user delete already nulled
+     * created_by), exactly like an approved row.
+     *
+     * @param  Collection  $ownPendingIds  captured before the user was deleted
+     */
+    private function removeUnreferencedPendingExercises($ownPendingIds): void
+    {
+        if ($ownPendingIds->isEmpty()) {
+            return;
+        }
+
+        Exercise::whereIn('id', $ownPendingIds)
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('day_exercise')
+                ->whereColumn('day_exercise.exercise_id', 'exercises.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('set_logs')
+                ->whereColumn('set_logs.exercise_id', 'exercises.id'))
+            ->delete();
     }
 
     /**

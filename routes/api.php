@@ -30,6 +30,9 @@ Route::middleware(['auth:api', 'verified'])->group(function () {
         Route::post('/exercises/{exercise}/reject', [AdminExerciseController::class, 'reject']);
     });
     Route::get('/programs/discover', [ProgramController::class, 'discover']);
+    // Create a program from an uploaded file (export is client-side — see
+    // App\Services\ProgramFile).
+    Route::post('/programs/import', [ProgramController::class, 'import']);
     Route::get('/programs/by-day/{day}', [ProgramController::class, 'getByDay']);
     Route::post('/programs/{program}/clone', [ProgramController::class, 'clone']);
     Route::apiResource('programs', ProgramController::class);

@@ -25,7 +25,7 @@ class ExerciseTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
-    public function test_user_contributions_are_pending_and_hidden_from_others()
+    public function test_user_contributions_are_pending_and_hidden_from_the_catalog()
     {
         $contributor = User::factory()->create();
         $otherUser = User::factory()->create();
@@ -38,14 +38,40 @@ class ExerciseTest extends TestCase
         ]);
         $response->assertStatus(201)->assertJsonPath('data.status', 'pending');
 
-        // Contributor sees their own pending exercise.
+        // The catalog is approved-only, so a contributor cannot select their own
+        // pending exercise either — that's what keeps programs referencing only
+        // exercises a program file can resolve by name elsewhere.
         $this->getJson('/api/exercises?search=Special')
             ->assertStatus(200)
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(0, 'data');
 
-        // Other users don't, until it's approved.
+        // They still track it on Contribute via /exercises/mine.
+        $this->getJson('/api/exercises/mine?search=Special')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', 'pending');
+
+        // Other users don't see it in the catalog either.
         Passport::actingAs($otherUser);
         $this->getJson('/api/exercises?search=Special')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_rejected_exercises_are_excluded_from_the_catalog()
+    {
+        $contributor = User::factory()->create();
+        Passport::actingAs($contributor);
+
+        Exercise::create([
+            'name' => 'Rejected Movement',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Isolation',
+            'created_by' => $contributor->id,
+            'status' => 'rejected',
+        ]);
+
+        $this->getJson('/api/exercises?search=Rejected')
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
     }

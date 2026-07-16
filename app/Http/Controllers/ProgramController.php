@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportProgramRequest;
 use App\Http\Requests\StoreProgramRequest;
 use App\Http\Requests\UpdateProgramRequest;
 use App\Http\Resources\ProgramResource;
@@ -9,6 +10,7 @@ use App\Models\Program;
 use App\Models\ProgramDay;
 use App\Models\WorkoutLog;
 use App\Services\ProgramDaySync;
+use App\Services\ProgramImporter;
 use Illuminate\Http\Request;
 
 class ProgramController extends Controller
@@ -104,7 +106,7 @@ class ProgramController extends Controller
      * programs" action from Discover. Days and their full prescription pivots
      * are copied; the source program is never modified.
      */
-    public function clone(Request $request, Program $program)
+    public function clone(Request $request, Program $program, ProgramDaySync $daySync)
     {
         // Cloning is for saving *other people's* public programs. You already
         // have your own — the button is hidden client-side, and this guards a
@@ -118,7 +120,7 @@ class ProgramController extends Controller
             abort(403);
         }
 
-        $copy = \DB::transaction(function () use ($request, $program) {
+        $copy = \DB::transaction(function () use ($request, $program, $daySync) {
             $copy = $request->user()->programs()->create([
                 'name' => $program->name,
                 'is_public' => false,
@@ -128,34 +130,26 @@ class ProgramController extends Controller
 
             $program->load('days.exercises');
 
-            foreach ($program->days as $day) {
-                $newDay = $copy->days()->create([
-                    'day_name' => $day->day_name,
-                    'display_order' => $day->display_order,
-                ]);
-
-                $exercises = [];
-                foreach ($day->exercises as $exercise) {
-                    $exercises[$exercise->id] = [
-                        'display_order' => $exercise->pivot->display_order,
-                        'target_sets' => $exercise->pivot->target_sets,
-                        'rep_range_min' => $exercise->pivot->rep_range_min,
-                        'rep_range_max' => $exercise->pivot->rep_range_max,
-                        'target_rpe' => $exercise->pivot->target_rpe,
-                        'rest_seconds' => $exercise->pivot->rest_seconds,
-                        'notes' => $exercise->pivot->notes,
-                    ];
-                }
-
-                if (! empty($exercises)) {
-                    $newDay->exercises()->sync($exercises);
-                }
-            }
+            $daySync->sync($copy, $daySync->toDaysPayload($program));
 
             return $copy;
         });
 
         return new ProgramResource($copy->load($this->ownDaysWith()));
+    }
+
+    /**
+     * Create a program from an uploaded program file. Export is generated
+     * client-side, so this is the only half of the round-trip that needs an
+     * endpoint. The copy lands private + inactive, like clone().
+     */
+    public function import(ImportProgramRequest $request, ProgramImporter $importer)
+    {
+        $program = $importer->import($request->user(), $request->validated());
+
+        return (new ProgramResource($program->load($this->ownDaysWith())))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Request $request, Program $program)

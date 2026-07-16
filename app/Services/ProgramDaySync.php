@@ -47,6 +47,37 @@ class ProgramDaySync
     }
 
     /**
+     * Serialize an existing program's days back into the payload shape sync()
+     * consumes — the inverse of the above, so a deep copy (clone / import) can
+     * round-trip through this one service instead of rebuilding the pivot by
+     * hand. Ids are deliberately omitted: the result describes days to CREATE on
+     * another program, not days to update in place.
+     *
+     * Expects `days.exercises` to be eager-loaded.
+     */
+    public function toDaysPayload(Program $program): array
+    {
+        return $program->days
+            ->sortBy('display_order')
+            ->values()
+            ->map(fn (ProgramDay $day) => [
+                'day_name' => $day->day_name,
+                'display_order' => $day->display_order,
+                'exercises' => $day->exercises
+                    ->sortBy(fn ($exercise) => $exercise->pivot->display_order)
+                    ->values()
+                    ->map(fn ($exercise) => [
+                        'exercise_id' => $exercise->id,
+                        ...collect(self::PRESCRIPTION_KEYS)
+                            ->mapWithKeys(fn ($key) => [$key => $exercise->pivot->{$key}])
+                            ->all(),
+                    ])
+                    ->all(),
+            ])
+            ->all();
+    }
+
+    /**
      * Update an existing day (when the payload carries a real id belonging to
      * this program) or create a new one.
      */

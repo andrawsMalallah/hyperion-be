@@ -156,6 +156,46 @@ class AdminExerciseTest extends TestCase
         Notification::assertSentTo($contributor, ExerciseRejected::class);
     }
 
+    /**
+     * Once approved, an exercise is a shared catalog row other members' programs
+     * may reference — flipping it to rejected would pull it out of the catalog
+     * and break export/import for every program using it (ProgramImporter
+     * resolves names against approved rows only).
+     */
+    public function test_an_approved_exercise_cannot_be_rejected()
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+        $contributor = User::factory()->create();
+        $exercise = $this->pendingExercise($contributor);
+        $exercise->update(['status' => 'approved']);
+
+        Passport::actingAs($admin);
+
+        $this->postJson('/api/admin/exercises/'.$exercise->id.'/reject', [
+            'reason' => 'Changed my mind.',
+        ])->assertStatus(422);
+
+        $this->assertDatabaseHas('exercises', ['id' => $exercise->id, 'status' => 'approved']);
+        Notification::assertNothingSent();
+    }
+
+    public function test_a_rejected_exercise_can_be_rejected_again_to_fix_the_reason()
+    {
+        $admin = User::factory()->admin()->create();
+        $contributor = User::factory()->create();
+        $exercise = $this->pendingExercise($contributor);
+
+        Passport::actingAs($admin);
+
+        $this->postJson('/api/admin/exercises/'.$exercise->id.'/reject', ['reason' => 'Typo here.'])
+            ->assertStatus(200);
+        $this->postJson('/api/admin/exercises/'.$exercise->id.'/reject', ['reason' => 'Duplicate of Barbell Curl.'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.rejection_reason', 'Duplicate of Barbell Curl.');
+    }
+
     public function test_reject_reason_is_optional_but_capped()
     {
         $admin = User::factory()->admin()->create();

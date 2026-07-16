@@ -79,9 +79,19 @@ class AdminExerciseController extends Controller
     /**
      * Reject a pending contribution (with an optional reason) and notify its
      * contributor.
+     *
+     * An already-APPROVED exercise cannot be rejected: it's a shared catalog row
+     * that other members' programs may already reference, and flipping it out of
+     * the catalog would break their program's export/import (a file naming it
+     * would no longer resolve — see ProgramImporter). Re-rejecting an already
+     * rejected one is allowed, so a reason can still be corrected.
      */
     public function reject(RejectExerciseRequest $request, Exercise $exercise)
     {
+        if ($exercise->status === 'approved') {
+            abort(422, 'This exercise is already approved and in the shared catalog, so it can no longer be rejected.');
+        }
+
         $exercise->update([
             'status' => 'rejected',
             'rejection_reason' => $request->validated('reason'),
