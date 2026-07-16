@@ -177,6 +177,60 @@ class ProgramImportTest extends TestCase
         $this->postJson('/api/programs/import', $this->file())->assertStatus(401);
     }
 
+    public function test_import_carries_exercise_groups_through()
+    {
+        $user = User::factory()->create();
+        $bench = $this->exercise('Bench Press');
+        $fly = $this->exercise('Cable Fly');
+        Passport::actingAs($user);
+
+        $file = $this->file();
+        $file['program']['days'][0]['exercises'] = [
+            ['name' => 'Bench Press', 'group_type' => 'superset', 'group_key' => 1],
+            ['name' => 'Cable Fly', 'group_type' => 'superset', 'group_key' => 1],
+        ];
+
+        $this->postJson('/api/programs/import', $file)
+            ->assertStatus(201)
+            ->assertJsonPath('data.days.0.exercises.0.id', $bench->id)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_type', 'superset')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_key', 1)
+            ->assertJsonPath('data.days.0.exercises.1.id', $fly->id)
+            ->assertJsonPath('data.days.0.exercises.1.pivot.group_key', 1);
+    }
+
+    public function test_import_rejects_a_file_whose_group_is_the_wrong_size()
+    {
+        $user = User::factory()->create();
+        $this->exercise('Bench Press');
+        Passport::actingAs($user);
+
+        // A hand-edited file: a superset naming only one exercise.
+        $file = $this->file();
+        $file['program']['days'][0]['exercises'][0]['group_type'] = 'superset';
+        $file['program']['days'][0]['exercises'][0]['group_key'] = 1;
+
+        $this->postJson('/api/programs/import', $file)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['program.days.0.exercises.0.group_type']);
+
+        $this->assertEquals(0, $user->programs()->count());
+    }
+
+    public function test_import_still_accepts_a_schema_version_1_file()
+    {
+        // Version 1 predates grouping. Its files stay importable — they simply
+        // describe no groups — so nothing already exported is stranded.
+        $user = User::factory()->create();
+        $this->exercise('Bench Press');
+        Passport::actingAs($user);
+
+        $this->postJson('/api/programs/import', $this->file(['schema_version' => 1]))
+            ->assertStatus(201)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_type', null)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_key', null);
+    }
+
     /**
      * A verbatim file as the client's exporter emits it (frontend
      * src/utils/programFile.js buildProgramFile). Export is generated there, not
@@ -187,14 +241,15 @@ class ProgramImportTest extends TestCase
     {
         $user = User::factory()->create();
         $bench = $this->exercise('Bench Press');
+        $fly = $this->exercise('Cable Fly');
         $row = $this->exercise('Barbell Row');
         Passport::actingAs($user);
 
         $exported = <<<'JSON'
         {
           "app": "hyperion",
-          "schema_version": 1,
-          "exported_at": "2026-07-16T09:48:06.919Z",
+          "schema_version": 2,
+          "exported_at": "2026-07-16T12:53:24.357Z",
           "program": {
             "name": "Push / Pull!",
             "days": [
@@ -209,9 +264,23 @@ class ProgramImportTest extends TestCase
                     "rep_range_min": 6,
                     "rep_range_max": 8,
                     "target_rpe": 8,
-                    "rest_seconds": 180
+                    "rest_seconds": 180,
+                    "group_type": "superset",
+                    "group_key": 1
                   },
-                  { "name": "Barbell Row", "target_muscle_group": "Back" }
+                  {
+                    "name": "Cable Fly",
+                    "target_muscle_group": "Chest",
+                    "group_type": "superset",
+                    "group_key": 1,
+                    "rest_seconds": 90
+                  },
+                  {
+                    "name": "Barbell Row",
+                    "target_muscle_group": "Back",
+                    "group_type": "drop_set",
+                    "target_sets": 3
+                  }
                 ]
               },
               {
@@ -241,13 +310,22 @@ class ProgramImportTest extends TestCase
             ->assertJsonPath('data.days.1.day_name', 'Pull')
             // Day order and each day's exercise order survive the round-trip.
             ->assertJsonPath('data.days.0.exercises.0.id', $bench->id)
-            ->assertJsonPath('data.days.0.exercises.1.id', $row->id)
+            ->assertJsonPath('data.days.0.exercises.1.id', $fly->id)
+            ->assertJsonPath('data.days.0.exercises.2.id', $row->id)
             ->assertJsonPath('data.days.0.exercises.0.pivot.target_rpe', 8)
-            // An exercise with no prescription in the file stays unset, not zeroed.
-            ->assertJsonPath('data.days.0.exercises.1.pivot.target_sets', null)
+            // The superset survives, and the rest that fires after it is the
+            // last member's.
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_type', 'superset')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_key', 1)
+            ->assertJsonPath('data.days.0.exercises.1.pivot.group_key', 1)
+            ->assertJsonPath('data.days.0.exercises.1.pivot.rest_seconds', 90)
+            // A tag type carries no group.
+            ->assertJsonPath('data.days.0.exercises.2.pivot.group_type', 'drop_set')
+            ->assertJsonPath('data.days.0.exercises.2.pivot.group_key', null)
             // The same exercise carries a different prescription on another day.
             ->assertJsonPath('data.days.1.exercises.0.id', $row->id)
             ->assertJsonPath('data.days.1.exercises.0.pivot.target_sets', 3)
+            ->assertJsonPath('data.days.1.exercises.0.pivot.group_type', null)
             ->assertJsonPath('data.days.1.exercises.0.pivot.notes', 'Slow eccentric.');
     }
 }

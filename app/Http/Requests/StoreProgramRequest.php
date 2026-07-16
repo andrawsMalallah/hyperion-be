@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ExerciseGrouping;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreProgramRequest extends FormRequest
 {
@@ -31,6 +33,26 @@ class StoreProgramRequest extends FormRequest
             'days.*.exercises.*.target_rpe' => 'nullable|integer|min:1|max:10',
             'days.*.exercises.*.rest_seconds' => 'nullable|integer|min:0|max:600',
             'days.*.exercises.*.notes' => 'nullable|string|max:500',
+            'days.*.exercises.*.group_type' => 'nullable|string|in:'.implode(',', ExerciseGrouping::allTypes()),
+            'days.*.exercises.*.group_key' => 'nullable|integer|min:0|max:255',
+        ];
+    }
+
+    /**
+     * Group sizes (a superset joins exactly 2 exercises, a giant set 3+) depend
+     * on the other exercises in the same day, so they're checked once the
+     * per-field rules above have passed.
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                ExerciseGrouping::validateDays($validator, $this->input('days', []), 'days');
+            },
         ];
     }
 
@@ -67,6 +89,8 @@ class StoreProgramRequest extends FormRequest
             'days.*.exercises.*.target_rpe' => 'target RPE',
             'days.*.exercises.*.rest_seconds' => 'rest time',
             'days.*.exercises.*.notes' => 'notes',
+            'days.*.exercises.*.group_type' => 'exercise type',
+            'days.*.exercises.*.group_key' => 'exercise group',
         ];
     }
 }

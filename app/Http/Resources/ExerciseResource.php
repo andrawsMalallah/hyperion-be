@@ -34,6 +34,10 @@ class ExerciseResource extends JsonResource
                     'target_rpe' => $this->pivot->target_rpe,
                     'rest_seconds' => $this->pivot->rest_seconds,
                     'notes' => $this->pivot->notes,
+                    // How the exercise is performed, and (for supersets / giant
+                    // sets) which group of the day it belongs to.
+                    'group_type' => $this->pivot->group_type,
+                    'group_key' => $this->pivot->group_key,
                 ];
             }),
         ];

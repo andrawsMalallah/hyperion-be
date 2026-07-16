@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ExerciseGrouping;
 use App\Services\ProgramFile;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 /**
  * Validates an uploaded program file's envelope and shape. The client parses the
@@ -27,7 +29,7 @@ class ImportProgramRequest extends FormRequest
             // Envelope — rejects files that aren't ours, and any future format
             // this version doesn't know how to read.
             'app' => 'required|string|in:'.ProgramFile::APP_MARKER,
-            'schema_version' => 'required|integer|in:'.ProgramFile::SCHEMA_VERSION,
+            'schema_version' => 'required|integer|in:'.implode(',', ProgramFile::SUPPORTED_SCHEMA_VERSIONS),
 
             'program' => 'required|array',
             'program.name' => 'required|string|max:255',
@@ -47,6 +49,29 @@ class ImportProgramRequest extends FormRequest
             'program.days.*.exercises.*.target_rpe' => 'nullable|integer|min:1|max:10',
             'program.days.*.exercises.*.rest_seconds' => 'nullable|integer|min:0|max:600',
             'program.days.*.exercises.*.notes' => 'nullable|string|max:500',
+
+            // Grouping — absent from schema_version 1 files, which import as
+            // plain ungrouped exercises.
+            'program.days.*.exercises.*.group_type' => 'nullable|string|in:'.implode(',', ExerciseGrouping::allTypes()),
+            'program.days.*.exercises.*.group_key' => 'nullable|integer|min:0|max:255',
+        ];
+    }
+
+    /**
+     * Group sizes depend on the other exercises in the same day, so they're
+     * checked once the per-field rules above have passed. A file carrying a
+     * broken group is rejected rather than imported with the group dropped.
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                ExerciseGrouping::validateDays($validator, $this->input('program.days', []), 'program.days');
+            },
         ];
     }
 
@@ -82,6 +107,8 @@ class ImportProgramRequest extends FormRequest
             'program.days.*.exercises.*.target_rpe' => 'target RPE',
             'program.days.*.exercises.*.rest_seconds' => 'rest time',
             'program.days.*.exercises.*.notes' => 'notes',
+            'program.days.*.exercises.*.group_type' => 'exercise type',
+            'program.days.*.exercises.*.group_key' => 'exercise group',
         ];
     }
 }

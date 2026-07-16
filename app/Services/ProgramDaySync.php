@@ -25,6 +25,8 @@ class ProgramDaySync
         'target_rpe',
         'rest_seconds',
         'notes',
+        'group_type',
+        'group_key',
     ];
 
     /**
