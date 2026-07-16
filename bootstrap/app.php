@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSentryUserContext;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureEmailVerified;
 use Illuminate\Database\QueryException;
@@ -7,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Sentry\Laravel\Integration;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -20,6 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->throttleApi();
 
+        // Tag Sentry error reports with the authenticated user's ID (no PII).
+        $middleware->api(append: [
+            AddSentryUserContext::class,
+        ]);
+
         // Override the framework's `verified` alias so an unverified account
         // gets a 409 { code: email_unverified } JSON response the SPA can act on,
         // instead of the default 403 (which the app reserves for authorization).
@@ -29,6 +36,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Report unhandled exceptions to Sentry. No-ops when no DSN is set, and
+        // only reports — the render callbacks below still shape what the client
+        // sees, so the sanitised production error messages are unaffected.
+        Integration::handles($exceptions);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );

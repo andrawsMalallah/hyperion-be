@@ -32,7 +32,10 @@ class AppServiceProvider extends ServiceProvider
     {
         Passport::tokensExpireIn(now()->addDays(15));
         Passport::refreshTokensExpireIn(now()->addDays(30));
-        Passport::personalAccessTokensExpireIn(now()->addDays(30));
+        // The SPA logs in with a personal access token held in localStorage, so this
+        // lifetime is also how long a stolen token stays usable — kept short-ish to
+        // limit that window (see ROADMAP 2.1).
+        Passport::personalAccessTokensExpireIn(now()->addDays(14));
 
         // Send mail through Brevo's HTTP API (mailer "brevo-api") so production
         // isn't dependent on outbound SMTP, which Render's free tier blocks —
