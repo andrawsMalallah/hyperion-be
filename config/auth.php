@@ -22,6 +22,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Auth Rate Limit
+    |--------------------------------------------------------------------------
+    |
+    | Requests per minute per IP allowed on the auth endpoints (login, register,
+    | forgot/reset password). Defaults to 5 — deliberately tight, since these are
+    | the endpoints worth brute-forcing. Production must never override it.
+    |
+    | It's configurable only so the E2E suite can raise it: the whole Playwright
+    | run drives auth from a single IP, which would otherwise trip the limit and
+    | fail tests for a reason that has nothing to do with the code under test.
+    | Lives here rather than as an env() call in the RateLimiter closure because
+    | env() returns null once config is cached.
+    |
+    */
+
+    'rate_limit' => (int) env('AUTH_RATE_LIMIT', 5),
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |

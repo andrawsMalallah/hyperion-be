@@ -52,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('auth', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            return Limit::perMinute(config('auth.rate_limit'))->by($request->ip());
         });
 
         Password::defaults(function () {
