@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "hyperion/backend",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Hyperion — JSON API for a mobile-first workout tracker (Laravel 13).",
+    "keywords": ["laravel", "api", "workout-tracker", "hyperion"],
     "license": "MIT",
     "require": {
         "php": "^8.3",
