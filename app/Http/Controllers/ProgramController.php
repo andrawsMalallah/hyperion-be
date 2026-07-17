@@ -224,9 +224,11 @@ class ProgramController extends Controller
         return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
-    public function getByDay(Request $request, $dayId)
+    public function getByDay(ProgramDay $day)
     {
-        $day = ProgramDay::findOrFail($dayId);
+        // Implicit route-model binding (route param {day}) — a missing id throws
+        // ModelNotFoundException like every other endpoint, so the 404 shape is
+        // consistent; a non-owner is stopped by the view policy (denies as 404).
         $program = $day->program;
         $this->authorize('view', $program);
 

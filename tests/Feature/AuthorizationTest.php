@@ -53,6 +53,20 @@ class AuthorizationTest extends TestCase
         $this->getJson("/api/programs/by-day/{$day->id}")->assertStatus(404);
     }
 
+    public function test_user_can_load_their_own_program_by_day(): void
+    {
+        $user = User::factory()->create();
+        $program = $user->programs()->create(['name' => 'Mine', 'is_active' => true]);
+        $day = $program->days()->create(['day_name' => 'Push', 'display_order' => 0]);
+
+        Passport::actingAs($user);
+
+        // Route-model binding resolves {day} and the owner gets the parent program.
+        $this->getJson("/api/programs/by-day/{$day->id}")
+            ->assertOk()
+            ->assertJson(['data' => ['id' => $program->id, 'name' => 'Mine']]);
+    }
+
     public function test_user_cannot_access_another_users_workout_log(): void
     {
         $owner = User::factory()->create();
