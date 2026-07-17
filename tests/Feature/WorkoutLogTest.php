@@ -284,4 +284,89 @@ class WorkoutLogTest extends TestCase
             ->assertStatus(200)
             ->assertJsonCount(2, 'data');
     }
+
+    /**
+     * Seed a user with three sessions on two programs plus one orphaned
+     * ("Unknown Day") session, spread across time, for the filter tests.
+     */
+    private function seedFilterableHistory(User $user): array
+    {
+        $ppl = $user->programs()->create(['name' => 'PPL', 'is_active' => true]);
+        $pushDay = $ppl->days()->create(['day_name' => 'Push', 'display_order' => 1]);
+
+        $upper = $user->programs()->create(['name' => 'Upper/Lower', 'is_active' => false]);
+        $upperDay = $upper->days()->create(['day_name' => 'Upper', 'display_order' => 1]);
+
+        // PPL: one recent, one old. Upper/Lower: one mid. Orphan: no program day.
+        $user->workoutLogs()->create(['program_day_id' => $pushDay->id, 'date_timestamp' => now()->subDays(2)]);
+        $user->workoutLogs()->create(['program_day_id' => $pushDay->id, 'date_timestamp' => now()->subDays(40)]);
+        $user->workoutLogs()->create(['program_day_id' => $upperDay->id, 'date_timestamp' => now()->subDays(10)]);
+        $user->workoutLogs()->create(['program_day_id' => null, 'date_timestamp' => now()->subDays(5)]);
+
+        return ['ppl' => $ppl, 'upper' => $upper];
+    }
+
+    public function test_history_can_be_filtered_by_program()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        ['ppl' => $ppl] = $this->seedFilterableHistory($user);
+
+        $this->getJson("/api/workout-logs?program_id={$ppl->id}")
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 2);
+    }
+
+    public function test_history_can_be_filtered_to_unknown_deleted_program_sessions()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $this->seedFilterableHistory($user);
+
+        $response = $this->getJson('/api/workout-logs?program_id=unknown')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+
+        $this->assertNull($response->json('data.0.program_day_id'));
+    }
+
+    public function test_history_can_be_filtered_by_date_range()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $this->seedFilterableHistory($user);
+
+        // Last 7 days: only the 2-day and 5-day sessions qualify.
+        $from = now()->subDays(7)->toDateString();
+        $this->getJson("/api/workout-logs?from={$from}")
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 2);
+    }
+
+    public function test_history_filters_combine_program_and_date_range()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        ['ppl' => $ppl] = $this->seedFilterableHistory($user);
+
+        // PPL has a 2-day and a 40-day session; last 7 days keeps only the first.
+        $from = now()->subDays(7)->toDateString();
+        $this->getJson("/api/workout-logs?program_id={$ppl->id}&from={$from}")
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_history_without_filters_returns_every_session()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+        $this->seedFilterableHistory($user);
+
+        $this->getJson('/api/workout-logs')
+            ->assertStatus(200)
+            ->assertJsonCount(4, 'data')
+            ->assertJsonPath('meta.total', 4);
+    }
 }

@@ -16,10 +16,31 @@ class WorkoutLogController extends Controller
 {
     public function index(Request $request)
     {
+        $filters = $request->validate([
+            // A real program id, or the literal 'unknown' for sessions whose
+            // program was deleted (program_day_id nulled out — "Unknown Day").
+            'program_id' => ['nullable', 'string'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
         $logs = $request->user()->workoutLogs()
             ->with(['day.program', 'sets.exercise'])
+            ->when(isset($filters['program_id']) && $filters['program_id'] !== '', function ($query) use ($filters) {
+                if ($filters['program_id'] === 'unknown') {
+                    $query->whereNull('program_day_id');
+                } else {
+                    // Scope to the program via the day. The base query is already
+                    // limited to this user's logs, so another user's program id
+                    // simply matches nothing — no cross-user leak.
+                    $query->whereHas('day', fn ($day) => $day->where('program_id', (int) $filters['program_id']));
+                }
+            })
+            ->when(! empty($filters['from']), fn ($query) => $query->whereDate('date_timestamp', '>=', $filters['from']))
+            ->when(! empty($filters['to']), fn ($query) => $query->whereDate('date_timestamp', '<=', $filters['to']))
             ->orderByDesc('date_timestamp')
-            ->paginate(30);
+            ->paginate(30)
+            ->withQueryString();
 
         return WorkoutLogResource::collection($logs);
     }
