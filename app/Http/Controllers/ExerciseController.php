@@ -24,12 +24,10 @@ class ExerciseController extends Controller
         // Contributors still track their own submissions via mine().
         $query->where('status', 'approved');
 
-        $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-
         if ($search) {
-            $query->where(function ($q) use ($search, $operator) {
-                $q->where('name', $operator, '%'.$search.'%')
-                    ->orWhere('target_muscle_group', $operator, '%'.$search.'%');
+            $query->where(function ($q) use ($search) {
+                $q->whereLike('name', '%'.$search.'%')
+                    ->orWhereLike('target_muscle_group', '%'.$search.'%');
             });
         }
 

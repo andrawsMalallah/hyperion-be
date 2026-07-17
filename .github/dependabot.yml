@@ -1,0 +1,29 @@
+version: 2
+
+# Dependency update PRs. Deliberately NOT auto-merged: a push to main is the
+# deploy trigger (Render), so anything that lands on main goes live once CI is
+# green — every PR here gets reviewed by hand.
+#
+# Opened as PRs, never pushed to main directly, so a Dependabot update can't
+# deploy itself. The repo's CI (tests + Pint on PHP 8.4) runs on each one.
+updates:
+  # Composer. The mail path (BrevoApiTransport) runs on Guzzle, so treat Guzzle
+  # PRs as production-affecting rather than routine chores.
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+
+  # The CI workflow's own actions (actions/checkout, setup-php, …). Low traffic,
+  # but this is what stops them silently aging out.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions

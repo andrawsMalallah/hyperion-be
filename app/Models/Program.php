@@ -18,8 +18,11 @@ class Program extends Model
         'is_public' => 'boolean',
     ];
 
+    // New programs are PRIVATE unless publishing is explicit (Session 26,
+    // ROADMAP 7.4) — an omitted flag must never mean "listed in Discover".
+    // The programs.is_public DB default was flipped to match in the same session.
     protected $attributes = [
-        'is_public' => true,
+        'is_public' => false,
     ];
 
     public function user()

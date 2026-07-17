@@ -8,10 +8,10 @@ use App\Http\Requests\UpdateProgramRequest;
 use App\Http\Resources\ProgramResource;
 use App\Models\Program;
 use App\Models\ProgramDay;
-use App\Models\WorkoutLog;
 use App\Services\ProgramDaySync;
 use App\Services\ProgramImporter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProgramController extends Controller
 {
@@ -35,18 +35,16 @@ class ProgramController extends Controller
 
         $query = Program::with(['user', 'days.exercises'])->where('is_public', true);
 
-        $operator = \DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-
         if ($search) {
-            $query->where(function ($q) use ($search, $operator) {
-                $q->where('name', $operator, '%'.$search.'%')
-                    ->orWhereHas('user', function ($qUser) use ($search, $operator) {
-                        $qUser->where('name', $operator, '%'.$search.'%');
+            $query->where(function ($q) use ($search) {
+                $q->whereLike('name', '%'.$search.'%')
+                    ->orWhereHas('user', function ($qUser) use ($search) {
+                        $qUser->whereLike('name', '%'.$search.'%');
                     })
-                    ->orWhereHas('days', function ($qDay) use ($search, $operator) {
-                        $qDay->where('day_name', $operator, '%'.$search.'%')
-                            ->orWhereHas('exercises', function ($qEx) use ($search, $operator) {
-                                $qEx->where('name', $operator, '%'.$search.'%');
+                    ->orWhereHas('days', function ($qDay) use ($search) {
+                        $qDay->whereLike('day_name', '%'.$search.'%')
+                            ->orWhereHas('exercises', function ($qEx) use ($search) {
+                                $qEx->whereLike('name', '%'.$search.'%');
                             });
                     });
             });
@@ -83,7 +81,7 @@ class ProgramController extends Controller
     {
         $validated = $request->validated();
 
-        $program = \DB::transaction(function () use ($request, $validated, $daySync) {
+        $program = DB::transaction(function () use ($request, $validated, $daySync) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
                 $request->user()->programs()->update(['is_active' => false]);
             }
@@ -120,7 +118,7 @@ class ProgramController extends Controller
             abort(403);
         }
 
-        $copy = \DB::transaction(function () use ($request, $program, $daySync) {
+        $copy = DB::transaction(function () use ($request, $program, $daySync) {
             $copy = $request->user()->programs()->create([
                 'name' => $program->name,
                 'is_public' => false,
@@ -165,7 +163,7 @@ class ProgramController extends Controller
 
         $validated = $request->validated();
 
-        \DB::transaction(function () use ($request, $program, $validated, $daySync) {
+        DB::transaction(function () use ($request, $program, $validated, $daySync) {
             if (isset($validated['is_active']) && $validated['is_active'] === true) {
                 $request->user()->programs()->where('id', '!=', $program->id)->update(['is_active' => false]);
             }
@@ -189,17 +187,19 @@ class ProgramController extends Controller
         return new ProgramResource($program->load($this->ownDaysWith()));
     }
 
+    /**
+     * Delete a program. Logged workouts are deliberately KEPT: the days cascade
+     * away and workout_logs.program_day_id nulls out (nullOnDelete), so the
+     * sessions survive as history without a day — History renders them as
+     * "Unknown Day". Removing a day in the builder already behaves this way
+     * (ProgramDaySync deletes days without touching logs); deleting the whole
+     * program must not be the one path that erases training history.
+     */
     public function destroy(Request $request, Program $program)
     {
         $this->authorize('delete', $program);
 
-        \DB::transaction(function () use ($program) {
-            $dayIds = $program->days()->pluck('id')->toArray();
-            if (! empty($dayIds)) {
-                WorkoutLog::whereIn('program_day_id', $dayIds)->delete();
-            }
-            $program->delete();
-        });
+        $program->delete();
 
         return response()->noContent();
     }

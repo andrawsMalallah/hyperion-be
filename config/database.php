@@ -102,6 +102,32 @@ return [
             ],
         ],
 
+        /*
+         * Production Neon, for `php artisan hyperion:backup-prod` only (ROADMAP
+         * 6.4). A template: `url` is filled in at runtime from the connection
+         * string the command prompts for, so **no credential and no production
+         * hostname is ever stored** — not here (this repo is public), not in
+         * .env, not in the shell history. With no url this connection cannot
+         * open, which is exactly right: it's inert in dev, CI and on Render.
+         *
+         * Deliberately SEPARATE from the default connection: the local .env
+         * points at a SQLite snapshot, and a "backup" that silently dumped that
+         * instead of production would be worse than none — insurance that is
+         * really a copy of a copy.
+         *
+         * The standing rule (production Neon is never written to) is enforced at
+         * the session level by the command itself.
+         */
+        'neon_backup' => [
+            'driver' => 'pgsql',
+            'url' => null,
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'require',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

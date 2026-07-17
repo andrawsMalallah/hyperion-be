@@ -11,6 +11,14 @@ fi
 echo "Running migrations..."
 php artisan migrate --force
 
+# Delete dead Passport tokens (ROADMAP 7.5). Every login mints a token and every
+# logout revokes one, but nothing ever removed the dead rows — and the free tier
+# has no scheduler, so this deploy hook is the only place a purge can run.
+# Only touches tokens that are already useless: revoked ones, and expired ones
+# past the 7-day retention default. Live sessions are untouched.
+echo "Purging revoked and expired tokens..."
+php artisan passport:purge
+
 # Cache routes and config for production performance
 echo "Caching configuration and routes..."
 php artisan optimize

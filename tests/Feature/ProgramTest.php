@@ -46,8 +46,9 @@ class ProgramTest extends TestCase
 
         Passport::actingAs($user1);
 
-        $user1->programs()->create(['name' => 'Upper Body Program', 'is_active' => true]);
-        $user2->programs()->create(['name' => 'Lower Body Program', 'is_active' => false]);
+        // Explicitly published — new programs are private by default (7.4).
+        $user1->programs()->create(['name' => 'Upper Body Program', 'is_active' => true, 'is_public' => true]);
+        $user2->programs()->create(['name' => 'Lower Body Program', 'is_active' => false, 'is_public' => true]);
 
         $response = $this->getJson('/api/programs/discover');
 
@@ -72,8 +73,9 @@ class ProgramTest extends TestCase
 
         Passport::actingAs($user1);
 
-        $user1->programs()->create(['name' => 'Push Pull Legs', 'is_active' => true]);
-        $user2->programs()->create(['name' => 'Arnold Program', 'is_active' => false]);
+        // Explicitly published — new programs are private by default (7.4).
+        $user1->programs()->create(['name' => 'Push Pull Legs', 'is_active' => true, 'is_public' => true]);
+        $user2->programs()->create(['name' => 'Arnold Program', 'is_active' => false, 'is_public' => true]);
 
         // Search for "Push"
         $response = $this->getJson('/api/programs/discover?search=Push');
@@ -114,6 +116,19 @@ class ProgramTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Public Program');
+    }
+
+    public function test_a_new_program_is_private_by_default()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        // No is_public in the payload — an omitted flag must never publish.
+        $this->postJson('/api/programs', ['name' => 'Quiet Program', 'is_active' => false])
+            ->assertStatus(201)
+            ->assertJsonPath('data.is_public', false);
+
+        $this->assertDatabaseHas('programs', ['name' => 'Quiet Program', 'is_public' => false]);
     }
 
     public function test_program_stores_and_returns_exercise_prescriptions()
@@ -358,5 +373,43 @@ class ProgramTest extends TestCase
         $this->postJson("/api/programs/{$program->id}/clone")->assertStatus(403);
 
         $this->assertEquals(0, $intruder->programs()->count());
+    }
+
+    public function test_deleting_a_program_keeps_the_logged_workout_history()
+    {
+        $user = User::factory()->create();
+        Passport::actingAs($user);
+
+        $exercise = Exercise::create(['name' => 'Bench Press', 'target_muscle_group' => 'Chest', 'mechanics_type' => 'Compound']);
+        $program = $user->programs()->create(['name' => 'Push Pull Legs', 'is_active' => true]);
+        $day = $program->days()->create(['day_name' => 'Push', 'display_order' => 1]);
+
+        $log = $user->workoutLogs()->create([
+            'program_day_id' => $day->id,
+            'date_timestamp' => now(),
+        ]);
+        $log->sets()->create([
+            'exercise_id' => $exercise->id,
+            'weight' => 80,
+            'reps' => 8,
+            'set_order' => 1,
+        ]);
+
+        $this->deleteJson("/api/programs/{$program->id}")->assertStatus(204);
+
+        // The program and its days are gone…
+        $this->assertDatabaseMissing('programs', ['id' => $program->id]);
+        $this->assertDatabaseMissing('program_days', ['id' => $day->id]);
+
+        // …but the training history survives: the log is orphaned from the day
+        // (program_day_id nulls out via the FK), and its sets are intact.
+        $this->assertDatabaseHas('workout_logs', ['id' => $log->id, 'program_day_id' => null]);
+        $this->assertDatabaseCount('set_logs', 1);
+
+        // History still lists and renders the orphaned session.
+        $this->getJson('/api/workout-logs')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $log->id);
     }
 }

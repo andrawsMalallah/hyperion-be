@@ -8,6 +8,7 @@ use App\Http\Resources\WorkoutLogResource;
 use App\Models\Exercise;
 use App\Models\SetLog;
 use App\Models\WorkoutLog;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -137,25 +138,52 @@ class WorkoutLogController extends Controller
         // than once (e.g. the first response never made it back). If we
         // already stored this client_uuid for this user, return the existing
         // record instead of creating a duplicate.
-        if (! empty($data['client_uuid'])) {
-            $existing = $request->user()->workoutLogs()
-                ->where('client_uuid', $data['client_uuid'])
-                ->first();
-
-            if ($existing) {
-                return new WorkoutLogResource($existing->load(['day.program', 'sets.exercise']));
-            }
+        if ($existing = $this->existingByClientUuid($request, $data)) {
+            return new WorkoutLogResource($existing->load(['day.program', 'sets.exercise']));
         }
 
-        $workout = $request->user()->workoutLogs()->create($data);
+        // One transaction for the log and its sets: a failure partway through
+        // must roll back the log row too. A half-saved workout would otherwise
+        // burn its client_uuid — the offline retry would hit the replay check
+        // above, get the partial log back, and dequeue the payload as synced,
+        // silently losing the remaining sets.
+        try {
+            $workout = DB::transaction(function () use ($request, $data) {
+                $workout = $request->user()->workoutLogs()->create($data);
 
-        if ($request->has('sets')) {
-            foreach ($request->sets as $setData) {
-                $workout->sets()->create($setData);
+                if (! empty($data['sets'])) {
+                    $workout->sets()->createMany($data['sets']);
+                }
+
+                return $workout;
+            });
+        } catch (QueryException $e) {
+            // A concurrent replay can pass the check above before the winner
+            // commits; the loser then trips the (user_id, client_uuid) unique
+            // index. Answer with the winner's row — same as the replay check.
+            if ($existing = $this->existingByClientUuid($request, $data)) {
+                return new WorkoutLogResource($existing->load(['day.program', 'sets.exercise']));
             }
+
+            throw $e;
         }
 
         return new WorkoutLogResource($workout->load(['day.program', 'sets.exercise']));
+    }
+
+    /**
+     * The workout this user already stored under the payload's client_uuid,
+     * if any — the server-side half of the offline outbox's dedup.
+     */
+    private function existingByClientUuid(Request $request, array $data): ?WorkoutLog
+    {
+        if (empty($data['client_uuid'])) {
+            return null;
+        }
+
+        return $request->user()->workoutLogs()
+            ->where('client_uuid', $data['client_uuid'])
+            ->first();
     }
 
     public function show(Request $request, WorkoutLog $workoutLog)
@@ -171,7 +199,7 @@ class WorkoutLogController extends Controller
 
         $data = $request->validated();
 
-        DB::transaction(function () use ($request, $workoutLog, $data) {
+        DB::transaction(function () use ($workoutLog, $data) {
             // Only touch notes if the caller sent them (a notes-only patch from
             // the post-save summary modal must not wipe the sets, and a sets
             // edit must not clear existing notes).
@@ -181,11 +209,9 @@ class WorkoutLogController extends Controller
             }
 
             // Full replace: the edit modal always sends the complete set list.
-            if ($request->has('sets')) {
+            if (array_key_exists('sets', $data)) {
                 $workoutLog->sets()->delete();
-                foreach ($request->sets as $setData) {
-                    $workoutLog->sets()->create($setData);
-                }
+                $workoutLog->sets()->createMany($data['sets']);
             }
         });
 

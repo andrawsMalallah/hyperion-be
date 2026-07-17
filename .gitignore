@@ -3,6 +3,10 @@
 .env
 .env.backup
 .env.production
+# hyperion:backup-prod writes outside the repo by default; this is the guard for
+# a --path that lands here. A dump holds real emails, password hashes and live
+# tokens — it must never be committable.
+/db_backups
 .phpactor.json
 .phpunit.result.cache
 /.codex
