@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateProgramRequest;
 use App\Http\Resources\ProgramResource;
 use App\Models\Program;
 use App\Models\ProgramDay;
+use App\Models\User;
 use App\Services\ProgramDaySync;
 use App\Services\ProgramImporter;
 use Illuminate\Http\Request;
@@ -118,22 +119,67 @@ class ProgramController extends Controller
             abort(403);
         }
 
-        $copy = DB::transaction(function () use ($request, $program, $daySync) {
-            $copy = $request->user()->programs()->create([
-                'name' => $program->name,
+        $copy = $this->deepCopy($program, $request->user(), $program->name, $program->id, $daySync);
+
+        return new ProgramResource($copy->load($this->ownDaysWith()));
+    }
+
+    /**
+     * Duplicate one of the user's OWN programs — a starting point for a
+     * variation without rebuilding it by hand. Shares clone()'s copy body but
+     * deliberately not its authorization: clone is public-only and rejects your
+     * own programs, which is the exact opposite rule.
+     *
+     * source_program_id stays null. Its only consumer is discover()'s
+     * "already saved" flag, which would then mark the user's own public program
+     * as saved-from-Discover — a duplicate is not that.
+     */
+    public function duplicate(Request $request, Program $program, ProgramDaySync $daySync)
+    {
+        $this->authorize('view', $program);
+
+        $copy = $this->deepCopy($program, $request->user(), $this->copyName($program->name), null, $daySync);
+
+        return (new ProgramResource($copy->load($this->ownDaysWith())))
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    /**
+     * Deep-copy a program into an account as a private, inactive draft: the
+     * shared body behind clone() and duplicate(). Days and their full
+     * prescription pivots come along (via ProgramDaySync, so a new prescription
+     * column can't silently skip copies); the source is never modified.
+     * Callers own the authorization — the two paths have different rules.
+     */
+    private function deepCopy(Program $source, User $owner, string $name, ?int $sourceProgramId, ProgramDaySync $daySync): Program
+    {
+        return DB::transaction(function () use ($source, $owner, $name, $sourceProgramId, $daySync) {
+            $copy = $owner->programs()->create([
+                'name' => $name,
                 'is_public' => false,
                 'is_active' => false,
-                'source_program_id' => $program->id,
+                'source_program_id' => $sourceProgramId,
             ]);
 
-            $program->load('days.exercises');
+            $source->load('days.exercises');
 
-            $daySync->sync($copy, $daySync->toDaysPayload($program));
+            $daySync->sync($copy, $daySync->toDaysPayload($source));
 
             return $copy;
         });
+    }
 
-        return new ProgramResource($copy->load($this->ownDaysWith()));
+    /**
+     * Name for a duplicate: "Full Body" → "Full Body (Copy)". The base is
+     * trimmed so the suffix always fits the column's 255 characters, rather than
+     * an already-long name failing the copy outright.
+     */
+    private function copyName(string $name): string
+    {
+        $suffix = ' (Copy)';
+
+        return mb_substr($name, 0, 255 - mb_strlen($suffix)).$suffix;
     }
 
     /**

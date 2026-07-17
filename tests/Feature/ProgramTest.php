@@ -375,6 +375,105 @@ class ProgramTest extends TestCase
         $this->assertEquals(0, $intruder->programs()->count());
     }
 
+    public function test_user_can_duplicate_their_own_program()
+    {
+        $user = User::factory()->create();
+
+        $exercise = Exercise::create([
+            'name' => 'Bench Press',
+            'target_muscle_group' => 'Chest',
+            'mechanics_type' => 'Compound',
+        ]);
+
+        $program = $user->programs()->create(['name' => 'Full Body', 'is_active' => true, 'is_public' => true]);
+        $day = $program->days()->create(['day_name' => 'Push', 'display_order' => 1]);
+        // The full prescription pivot, grouping columns included — a duplicate
+        // that quietly drops these is the whole failure mode this guards.
+        $day->exercises()->attach($exercise->id, [
+            'display_order' => 0,
+            'target_sets' => 4,
+            'rep_range_min' => 6,
+            'rep_range_max' => 10,
+            'target_rpe' => 9,
+            'rest_seconds' => 180,
+            'notes' => 'Pause on the chest.',
+            'group_type' => 'superset',
+            'group_key' => 1,
+        ]);
+
+        Passport::actingAs($user);
+        $response = $this->postJson("/api/programs/{$program->id}/duplicate");
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.name', 'Full Body (Copy)')
+            ->assertJsonPath('data.days.0.day_name', 'Push')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.target_sets', 4)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rep_range_min', 6)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rep_range_max', 10)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.target_rpe', 9)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.rest_seconds', 180)
+            ->assertJsonPath('data.days.0.exercises.0.pivot.notes', 'Pause on the chest.')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_type', 'superset')
+            ->assertJsonPath('data.days.0.exercises.0.pivot.group_key', 1);
+
+        $newId = $response->json('data.id');
+        $this->assertNotEquals($program->id, $newId);
+        $this->assertEquals(2, $user->programs()->count());
+    }
+
+    public function test_a_duplicate_lands_private_and_inactive_without_a_source_link()
+    {
+        $user = User::factory()->create();
+        // Public + active source: neither trait may carry over. A duplicate must
+        // not unseat the program the user is currently training, nor publish
+        // itself. source_program_id stays null — that column means "saved from
+        // Discover", and discover() would otherwise flag the user's own public
+        // program as already-saved.
+        $program = $user->programs()->create(['name' => 'Full Body', 'is_active' => true, 'is_public' => true]);
+
+        Passport::actingAs($user);
+        $response = $this->postJson("/api/programs/{$program->id}/duplicate")->assertStatus(201);
+
+        $this->assertDatabaseHas('programs', [
+            'id' => $response->json('data.id'),
+            'user_id' => $user->id,
+            'is_public' => false,
+            'is_active' => false,
+            'source_program_id' => null,
+        ]);
+
+        // The source is still the active program, and still public.
+        $this->assertEquals(1, $program->fresh()->is_active);
+        $this->assertEquals(1, $program->fresh()->is_public);
+    }
+
+    public function test_duplicating_a_long_name_stays_within_the_column_limit()
+    {
+        $user = User::factory()->create();
+        $program = $user->programs()->create(['name' => str_repeat('a', 255), 'is_active' => false]);
+
+        Passport::actingAs($user);
+        $response = $this->postJson("/api/programs/{$program->id}/duplicate")->assertStatus(201);
+
+        $name = $response->json('data.name');
+        $this->assertEquals(255, mb_strlen($name));
+        $this->assertStringEndsWith(' (Copy)', $name);
+    }
+
+    public function test_cannot_duplicate_a_program_you_do_not_own()
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        // Public, so this isn't merely hidden — duplicating is an owner-only
+        // action, and Discover's clone is the path for other people's programs.
+        $program = $owner->programs()->create(['name' => 'Not Yours', 'is_active' => false, 'is_public' => true]);
+
+        Passport::actingAs($intruder);
+        $this->postJson("/api/programs/{$program->id}/duplicate")->assertStatus(404);
+
+        $this->assertEquals(0, $intruder->programs()->count());
+    }
+
     public function test_deleting_a_program_keeps_the_logged_workout_history()
     {
         $user = User::factory()->create();

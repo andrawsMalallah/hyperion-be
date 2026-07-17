@@ -35,6 +35,8 @@ Route::middleware(['auth:api', 'verified'])->group(function () {
     Route::post('/programs/import', [ProgramController::class, 'import']);
     Route::get('/programs/by-day/{day}', [ProgramController::class, 'getByDay']);
     Route::post('/programs/{program}/clone', [ProgramController::class, 'clone']);
+    // Copy one of your OWN programs (clone is for other people's public ones).
+    Route::post('/programs/{program}/duplicate', [ProgramController::class, 'duplicate']);
     Route::apiResource('programs', ProgramController::class);
     Route::get('/user/settings', [UserSettingController::class, 'show']);
     Route::put('/user/settings', [UserSettingController::class, 'update']);
