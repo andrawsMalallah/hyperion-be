@@ -39,6 +39,63 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'new@example.com']);
     }
 
+    public function test_registration_is_rejected_when_the_honeypot_is_filled(): void
+    {
+        $this->setUpPassportClient();
+
+        $response = $this->postJson('/api/register', [
+            'name' => 'Spam Bot',
+            'email' => 'bot@example.com',
+            'password' => 'Super-Secret-Pass1!',
+            'password_confirmation' => 'Super-Secret-Pass1!',
+            'website' => 'http://spam.example.com',
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseMissing('users', ['email' => 'bot@example.com']);
+    }
+
+    public function test_the_honeypot_rejection_does_not_name_the_field(): void
+    {
+        // The whole point of a honeypot is that a bot can't learn which input to
+        // leave empty. Naming it in `errors` would hand that straight over.
+        //
+        // The trap short-circuits before token creation, so Passport is never
+        // reached — but set the client up anyway, so a regression fails on the
+        // assertion below rather than on a confusing Passport 500.
+        $this->setUpPassportClient();
+
+        $response = $this->postJson('/api/register', [
+            'name' => 'Spam Bot',
+            'email' => 'bot@example.com',
+            'password' => 'Super-Secret-Pass1!',
+            'password_confirmation' => 'Super-Secret-Pass1!',
+            'website' => 'http://spam.example.com',
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertArrayNotHasKey('errors', $response->json());
+        $this->assertStringNotContainsString('website', $response->getContent());
+    }
+
+    public function test_an_empty_honeypot_does_not_block_registration(): void
+    {
+        // A real browser posts the field present-but-empty, not absent. If that
+        // tripped the trap, nobody could ever sign up.
+        $this->setUpPassportClient();
+
+        $response = $this->postJson('/api/register', [
+            'name' => 'Real Person',
+            'email' => 'real@example.com',
+            'password' => 'Super-Secret-Pass1!',
+            'password_confirmation' => 'Super-Secret-Pass1!',
+            'website' => '',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('users', ['email' => 'real@example.com']);
+    }
+
     public function test_registration_rejects_weak_password(): void
     {
         $response = $this->postJson('/api/register', [
