@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Laravel\Passport\Client;
+use Laravel\Passport\Passport;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -160,6 +161,23 @@ class AuthTest extends TestCase
             'email' => $user->email,
             'password' => 'wrong-password',
         ])->assertStatus(429);
+    }
+
+    public function test_the_api_rate_limit_is_configurable_and_defaults_to_60(): void
+    {
+        // The E2E suite drives the whole API through one account, and the limiter
+        // keys by user id — so every spec shares a single budget and the run 429s
+        // as specs are added. Lowering it here proves the closure reads config
+        // rather than the old hardcoded 60 (see config/api.php).
+        $this->assertSame(60, (int) config('api.rate_limit'));
+
+        config(['api.rate_limit' => 2]);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        Passport::actingAs($user);
+
+        $this->getJson('/api/exercises')->assertStatus(200);
+        $this->getJson('/api/exercises')->assertStatus(200);
+        $this->getJson('/api/exercises')->assertStatus(429);
     }
 
     public function test_forgot_password_response_does_not_reveal_whether_email_exists(): void
