@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminExerciseController;
+use App\Http\Controllers\BodyMetricController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgressController;
@@ -42,5 +43,7 @@ Route::middleware(['auth:api', 'verified'])->group(function () {
     Route::put('/user/settings', [UserSettingController::class, 'update']);
     Route::get('/progress/stats', [ProgressController::class, 'stats']);
     Route::get('/progress/exercises/{exercise}/e1rm', [ProgressController::class, 'exerciseSeries']);
+    // Body-weight tracking (one entry per day; store upserts on the date).
+    Route::apiResource('body-metrics', BodyMetricController::class)->only(['index', 'store', 'destroy']);
     Route::apiResource('workout-logs', WorkoutLogController::class);
 });

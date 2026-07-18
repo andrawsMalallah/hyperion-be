@@ -46,4 +46,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(UserSetting::class);
     }
+
+    public function bodyMetrics()
+    {
+        return $this->hasMany(BodyMetric::class);
+    }
 }
