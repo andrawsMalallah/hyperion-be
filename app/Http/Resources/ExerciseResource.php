@@ -14,6 +14,9 @@ class ExerciseResource extends JsonResource
             'name' => $this->name,
             'target_muscle_group' => $this->target_muscle_group,
             'mechanics_type' => $this->mechanics_type,
+            // Drives which inputs the workout screen shows for this exercise
+            // (weight x reps, reps + optional added weight, or a duration).
+            'measurement_type' => $this->measurement_type,
             'status' => $this->status,
             // Present on the contributor's own list and the admin dashboard so a
             // rejected submission can show why it wasn't accepted.

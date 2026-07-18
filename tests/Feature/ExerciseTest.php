@@ -35,6 +35,7 @@ class ExerciseTest extends TestCase
             'name' => 'My Special Curl',
             'target_muscle_group' => 'Biceps',
             'mechanics_type' => 'Isolation',
+            'measurement_type' => 'weighted',
         ]);
         $response->assertStatus(201)->assertJsonPath('data.status', 'pending');
 

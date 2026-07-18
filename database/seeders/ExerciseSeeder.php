@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Exercise;
+use App\Services\ExerciseMeasurement;
 use Illuminate\Database\Seeder;
 
 class ExerciseSeeder extends Seeder
@@ -217,10 +218,67 @@ class ExerciseSeeder extends Seeder
         ];
 
         foreach ($exercises as $exercise) {
+            $exercise['measurement_type'] = self::measurementFor($exercise['name']);
+
             Exercise::firstOrCreate(
                 ['name' => $exercise['name']],
                 $exercise
             );
         }
+    }
+
+    /**
+     * How this exercise is measured. Applied here rather than spelled out on
+     * every row, since the overwhelming majority are plain weighted lifts.
+     *
+     * ⚠️ These lists are mirrored by the 2026_07_18 add_measurement_type
+     * migration, which retypes an EXISTING catalog. Both are needed and they
+     * are deliberately separate copies: the migration is a frozen historical
+     * record, while this is the live catalog definition — a fresh database
+     * (CI, a new dev machine) is seeded after migrations run, so without this
+     * every plank would come out weighted.
+     */
+    private static function measurementFor(string $name): string
+    {
+        $timed = [
+            'Plank',
+            'Side Plank',
+            'Dead Hang',
+            "Farmer's Walk",
+            'Plate Pinch',
+        ];
+
+        $bodyweight = [
+            'Ab Wheel Rollout',
+            'Bench Dips',
+            'Bicycle Crunch',
+            'Burpee',
+            "Captain's Chair Leg Raise",
+            'Chest Dips',
+            'Chin-Up',
+            'Crunch',
+            'Decline Crunch',
+            'Diamond Push-Up',
+            'Flutter Kicks',
+            'Glute-Ham Raise',
+            'Hanging Knee Raise',
+            'Hanging Leg Raise',
+            'Hyperextension (Back Extension)',
+            'Lying Leg Raise',
+            'Pull-Up',
+            'Push-Up',
+            'Russian Twist',
+            'Step-Ups',
+            'Triceps Dips',
+            'V-Ups',
+            'Weighted Pull-Up',
+            'Weighted Push-Up',
+        ];
+
+        return match (true) {
+            in_array($name, $timed, true) => ExerciseMeasurement::TIMED,
+            in_array($name, $bodyweight, true) => ExerciseMeasurement::BODYWEIGHT,
+            default => ExerciseMeasurement::WEIGHTED,
+        };
     }
 }

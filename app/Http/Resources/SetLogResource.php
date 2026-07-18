@@ -14,6 +14,8 @@ class SetLogResource extends JsonResource
             'exercise_id' => $this->exercise_id,
             'weight' => $this->weight,
             'reps' => $this->reps,
+            // Set for timed exercises only; reps is null on those and vice versa.
+            'duration_seconds' => $this->duration_seconds,
             'rpe' => $this->rpe,
             'set_type' => $this->set_type,
             'set_order' => $this->set_order,

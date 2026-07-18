@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ExerciseMeasurement;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreExerciseRequest extends FormRequest
 {
@@ -26,6 +28,7 @@ class StoreExerciseRequest extends FormRequest
             'name' => 'required|string|max:255|unique:exercises,name',
             'target_muscle_group' => 'required|string|max:255',
             'mechanics_type' => 'required|string|in:Compound,Isolation',
+            'measurement_type' => ['required', 'string', Rule::in(ExerciseMeasurement::allTypes())],
         ];
     }
 
@@ -41,6 +44,8 @@ class StoreExerciseRequest extends FormRequest
             'target_muscle_group.required' => 'Please select a target muscle group.',
             'mechanics_type.required' => 'Please select a mechanics type.',
             'mechanics_type.in' => 'Mechanics type must be either Compound or Isolation.',
+            'measurement_type.required' => 'Please choose how this exercise is measured.',
+            'measurement_type.in' => 'Measurement type must be weighted, bodyweight or timed.',
         ];
     }
 }

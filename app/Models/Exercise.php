@@ -11,6 +11,7 @@ class Exercise extends Model
         'name',
         'target_muscle_group',
         'mechanics_type',
+        'measurement_type',
         'created_by',
         'status',
         'rejection_reason',

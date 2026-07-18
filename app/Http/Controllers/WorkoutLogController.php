@@ -8,6 +8,7 @@ use App\Http\Resources\WorkoutLogResource;
 use App\Models\Exercise;
 use App\Models\SetLog;
 use App\Models\WorkoutLog;
+use App\Services\ExerciseMeasurement;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,11 +87,15 @@ class WorkoutLogController extends Controller
                 $latestLog[(int) $row->exercise_id] = (int) $row->workout_log_id;
             });
 
-        // All-time best Epley 1RM per exercise over working sets.
+        // All-time best Epley 1RM per exercise over working sets. Scoped to
+        // weighted exercises: a bodyweight set's weight is *added* load, so a
+        // +20kg pull-up would otherwise register as a 20kg lift.
         $bestE1rm = DB::table('set_logs')
             ->join('workout_logs', 'set_logs.workout_log_id', '=', 'workout_logs.id')
+            ->join('exercises', 'exercises.id', '=', 'set_logs.exercise_id')
             ->where('workout_logs.user_id', $userId)
             ->whereIn('set_logs.exercise_id', $ids)
+            ->where('exercises.measurement_type', ExerciseMeasurement::WEIGHTED)
             ->where('set_logs.set_type', '!=', 'warmup')
             ->where('set_logs.weight', '>', 0)
             ->where('set_logs.reps', '>', 0)
@@ -116,7 +121,10 @@ class WorkoutLogController extends Controller
                     $setsByExercise[$exId][] = [
                         'id' => $s->id,
                         'weight' => (float) $s->weight,
-                        'reps' => (int) $s->reps,
+                        // Nullable rather than cast: a timed set has no reps,
+                        // and (int) null would report a real "0 reps" set.
+                        'reps' => $s->reps === null ? null : (int) $s->reps,
+                        'duration_seconds' => $s->duration_seconds === null ? null : (int) $s->duration_seconds,
                         'rpe' => $s->rpe,
                         'set_type' => $s->set_type,
                         'set_order' => $s->set_order,
