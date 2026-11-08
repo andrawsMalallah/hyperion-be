@@ -1,4 +1,5 @@
-FROM php:8.4-fpm-alpine
+# Keep the October 2026 PHP security fixes explicit in production builds.
+FROM php:8.4.27-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
